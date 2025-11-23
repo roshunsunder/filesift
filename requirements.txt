@@ -10,3 +10,5 @@ tiktoken==0.4.0
 typing-extensions==4.7.1
 pathlib==1.0.1
 python-dateutil==2.8.2
+
+lmstudio
