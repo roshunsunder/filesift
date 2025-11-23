@@ -34,7 +34,7 @@ def test_initialization():
         
         # Test with specific model name
         try:
-            processor_named = ImageProcessor(model_name="qwen2-vl-2b-instruct")
+            processor_named = ImageProcessor(model_name="qwen/qwen3-vl-8b")
             print("✓ ImageProcessor initialized successfully (named model)")
             print(f"  Model name: {processor_named.model_name}")
         except Exception as e:
@@ -60,8 +60,7 @@ def test_can_handle():
     print("=" * 60)
     
     try:
-        hf_token = os.getenv("HF_BEARER_TOKEN", "test_token")
-        processor = ImageProcessor(hf_bearer_token=hf_token)
+        processor = ImageProcessor()
         
         # Test supported extensions
         supported_files = [
@@ -114,7 +113,7 @@ def test_can_handle():
         return False
 
 def test_process_with_image():
-    """Test process() method with a real image file"""
+    """Test process() method with image files from test_directory"""
     print("\n" + "=" * 60)
     print("Test 3: process() Method with Image File")
     print("=" * 60)
@@ -122,67 +121,77 @@ def test_process_with_image():
     try:
         processor = ImageProcessor()
         
-        # Look for test images in common locations
-        test_image_paths = [
-            Path("tests/manual/test_image.jpg"),
-            Path("tests/manual/test_image.png"),
-            Path("test_image.jpg"),
-            Path("test_image.png"),
-            Path("frontend/public/logo192.png"),
-            Path("frontend/public/logo512.png"),
-        ]
+        # Look for test images in test_directory
+        test_dir = Path("test_directory")
         
-        image_path = None
-        for path in test_image_paths:
-            if path.exists():
-                image_path = path
-                break
-        
-        if not image_path:
-            print("⚠ No test image found. Please provide an image file to test.")
-            print("  Place a test image (jpg, png, etc.) in one of these locations:")
-            for path in test_image_paths:
-                print(f"    - {path}")
-            print("\n  Or specify a path manually in the test script.")
+        if not test_dir.exists():
+            print(f"⚠ Test directory not found: {test_dir}")
+            print("  Create the directory and add test images to it.")
             return None
         
-        print(f"Using test image: {image_path}")
-        print(f"File size: {image_path.stat().st_size} bytes")
+        # Find all image files in the test directory
+        supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+        image_files = [
+            f for f in test_dir.iterdir()
+            if f.is_file() and f.suffix.lower() in supported_extensions
+        ]
         
-        # Process the image
-        print("\nProcessing image (this may take a few seconds)...")
-        result = processor.process(image_path)
+        if not image_files:
+            print(f"⚠ No image files found in {test_dir}")
+            print("  Supported formats: jpg, jpeg, png, gif, bmp, webp")
+            return None
         
-        # Validate result structure
-        print("\nResult structure:")
-        print(f"  content: {result.get('content', 'MISSING')[:100]}...")
-        print(f"  file_type: {result.get('file_type', 'MISSING')}")
-        print(f"  image_type: {result.get('image_type', 'MISSING')}")
+        print(f"Found {len(image_files)} image file(s) in {test_dir}")
         
-        metadata = result.get('metadata', {})
-        print(f"  metadata:")
-        print(f"    path: {metadata.get('path', 'MISSING')}")
-        print(f"    size: {metadata.get('size', 'MISSING')}")
-        print(f"    modified: {metadata.get('modified', 'MISSING')}")
+        # Process all images found
+        all_passed = True
+        for idx, image_path in enumerate(image_files, 1):
+            print(f"\n--- Processing image {idx}/{len(image_files)}: {image_path.name} ---")
+            print(f"File size: {image_path.stat().st_size} bytes")
+            
+            # Process the image
+            print("Processing image (this may take a few seconds)...")
+            result = processor.process(image_path)
+            
+            # Validate result structure
+            print("\nResult structure:")
+            print(f"  content: {result.get('content', 'MISSING')[:100]}...")
+            print(f"  file_type: {result.get('file_type', 'MISSING')}")
+            print(f"  image_type: {result.get('image_type', 'MISSING')}")
+            
+            metadata = result.get('metadata', {})
+            print(f"  metadata:")
+            print(f"    path: {metadata.get('path', 'MISSING')}")
+            print(f"    size: {metadata.get('size', 'MISSING')}")
+            print(f"    modified: {metadata.get('modified', 'MISSING')}")
+            
+            # Validate required fields
+            required_fields = ['content', 'file_type', 'image_type', 'metadata']
+            missing_fields = [field for field in required_fields if field not in result]
+            
+            if missing_fields:
+                print(f"\n✗ Missing required fields: {missing_fields}")
+                all_passed = False
+                continue
+            
+            if result['file_type'] != 'image':
+                print(f"\n✗ file_type should be 'image', got '{result['file_type']}'")
+                all_passed = False
+                continue
+            
+            if not result['content']:
+                print(f"\n✗ content should not be empty")
+                all_passed = False
+                continue
+            
+            print(f"✓ Image {idx} processed successfully")
         
-        # Validate required fields
-        required_fields = ['content', 'file_type', 'image_type', 'metadata']
-        missing_fields = [field for field in required_fields if field not in result]
-        
-        if missing_fields:
-            print(f"\n✗ Missing required fields: {missing_fields}")
+        if all_passed:
+            print(f"\n✓ process() test passed for all {len(image_files)} image(s)")
+            return True
+        else:
+            print(f"\n✗ process() test failed for some images")
             return False
-        
-        if result['file_type'] != 'image':
-            print(f"\n✗ file_type should be 'image', got '{result['file_type']}'")
-            return False
-        
-        if not result['content']:
-            print(f"\n✗ content should not be empty")
-            return False
-        
-        print("\n✓ process() test passed")
-        return True
         
     except Exception as e:
         print(f"✗ process() test failed: {str(e)}")
@@ -193,7 +202,7 @@ def test_process_with_image():
         print("2. Make sure a VLM (Vision-Language Model) is loaded in LM Studio")
         print("3. Verify the image file exists and is readable")
         print("4. Check that the image format is supported (JPEG, PNG, WebP)")
-        print("5. Try specifying a model: processor = ImageProcessor(model_name='qwen2-vl-2b-instruct')")
+        print("5. Try specifying a model: processor = ImageProcessor(model_name='qwen/qwen3-vl-8b')")
         return False
 
 def test_error_handling():
@@ -217,18 +226,25 @@ def test_error_handling():
         
         print("\nTesting with invalid file (non-image):")
         # Create a temporary text file
-        test_file = Path("tests/manual/temp_test.txt")
+        test_file = Path("temp_test.txt")
         try:
             test_file.parent.mkdir(parents=True, exist_ok=True)
             test_file.write_text("This is not an image")
             
-            # Should fail when trying to process as image
-            try:
-                result = processor.process(test_file)
-                print("⚠ Processing non-image file didn't raise exception")
-                print("  (This might be okay if can_handle() filters it out)")
-            except Exception as e:
-                print(f"✓ Correctly raised exception: {type(e).__name__}")
+            # First check that can_handle() correctly rejects non-image files
+            can_handle = processor.can_handle(test_file)
+            if not can_handle:
+                print(f"✓ can_handle() correctly returns False for .txt files")
+                print("  (Non-image files are filtered out before processing)")
+            else:
+                print(f"⚠ can_handle() returned True for .txt file (unexpected)")
+                # If can_handle returns True, we should test that process() fails
+                try:
+                    result = processor.process(test_file)
+                    print("✗ Processing non-image file didn't raise exception")
+                    return False
+                except Exception as e:
+                    print(f"✓ Processing non-image file correctly raised exception: {type(e).__name__}")
         finally:
             if test_file.exists():
                 test_file.unlink()
@@ -262,17 +278,18 @@ def test_api_response_structure():
             print("  Make sure LM Studio is running and a model is loaded")
             return None
         
-        # Test that we can prepare an image (if we have one)
-        test_image_paths = [
-            Path("frontend/public/logo192.png"),
-            Path("frontend/public/logo512.png"),
-        ]
-        
+        # Test that we can prepare an image from test_directory
+        test_dir = Path("test_directory")
         image_path = None
-        for path in test_image_paths:
-            if path.exists():
-                image_path = path
-                break
+        
+        if test_dir.exists():
+            supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+            image_files = [
+                f for f in test_dir.iterdir()
+                if f.is_file() and f.suffix.lower() in supported_extensions
+            ]
+            if image_files:
+                image_path = image_files[0]  # Use first image found
         
         if image_path:
             try:
@@ -282,7 +299,7 @@ def test_api_response_structure():
             except Exception as e:
                 print(f"⚠ Could not prepare image: {e}")
         else:
-            print("⚠ No test image found for API structure test")
+            print(f"⚠ No test image found in {test_dir} for API structure test")
         
         print("\n✓ LM Studio API integration test (informational)")
         return True
@@ -305,8 +322,8 @@ def main():
     print("\nPrerequisites:")
     print("1. LM Studio must be installed and running")
     print("2. A VLM (Vision-Language Model) must be loaded in LM Studio")
-    print("   (e.g., qwen2-vl-2b-instruct - download with: lms get qwen2-vl-2b-instruct)")
-    print("3. A test image file (jpg, png, webp) for processing tests")
+    print("   (e.g., qwen/qwen3-vl-8b - download with: lms get qwen/qwen3-vl-8b)")
+    print("3. Test images in test_directory/ (jpg, png, webp, etc.)")
     print("4. lmstudio package installed: pip install lmstudio")
     print("\n")
     

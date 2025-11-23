@@ -53,7 +53,7 @@ class Indexer:
         # Initialize processors
         self.processors: List[BaseFileProcessor] = [
             CodeProcessor(),
-            ImageProcessor(settings.HF_BEARER_TOKEN)
+            ImageProcessor()  # Uses default model loaded in LM Studio
         ]
         
         # Initialize vector store
