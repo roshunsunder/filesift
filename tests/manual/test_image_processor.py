@@ -153,9 +153,16 @@ def test_process_with_image():
             print("Processing image (this may take a few seconds)...")
             result = processor.process(image_path)
             
+            # Print the full image description
+            print("\n" + "=" * 60)
+            print("IMAGE DESCRIPTION:")
+            print("=" * 60)
+            description = result.get('content', 'MISSING')
+            print(description)
+            print("=" * 60)
+            
             # Validate result structure
             print("\nResult structure:")
-            print(f"  content: {result.get('content', 'MISSING')[:100]}...")
             print(f"  file_type: {result.get('file_type', 'MISSING')}")
             print(f"  image_type: {result.get('image_type', 'MISSING')}")
             
