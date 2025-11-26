@@ -6,10 +6,11 @@ import json
 import hashlib
 import pickle
 import re
-from langchain.vectorstores import FAISS
-from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
 from ..config.settings import settings

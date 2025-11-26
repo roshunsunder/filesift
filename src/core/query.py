@@ -5,9 +5,11 @@ from datetime import datetime, timedelta
 import openai
 import pickle
 import numpy as np
-from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.schema import Document
+
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import FAISS
+
+from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
 from ..config.settings import settings

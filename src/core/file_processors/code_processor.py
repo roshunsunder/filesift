@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Dict, Any, Set
 import openai
-from langchain.document_loaders import TextLoader
+from langchain_community.document_loaders import TextLoader
+
 from .base import BaseFileProcessor
 
 class CodeProcessor(BaseFileProcessor):

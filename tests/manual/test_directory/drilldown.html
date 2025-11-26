@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Speech Transcription</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4a5568;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            transition: background 0.3s ease;
+        }
+        
+        button:hover {
+            background: #3182ce;
+        }
+        
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        
+        .status.listening {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 2px solid #48bb78;
+        }
+        
+        .status.stopped {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 2px solid #f56565;
+        }
+        
+        .transcript-container {
+            min-height: 200px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f7fafc;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        
+        .transcript {
+            font-size: 16px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .interim {
+            color: #718096;
+            font-style: italic;
+        }
+        
+        .final {
+            color: #2d3748;
+        }
+        
+        .error {
+            color: #e53e3e;
+            text-align: center;
+            padding: 15px;
+            background: #fed7d7;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .info {
+            text-align: center;
+            color: #4a5568;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Real-Time Speech Transcription</h1>
+        
+        <div class="controls">
+            <button id="startBtn">Start Listening</button>
+            <button id="stopBtn" disabled>Stop Listening</button>
+            <button id="clearBtn">Clear Text</button>
+        </div>
+        
+        <div id="status" class="status stopped">Ready to start listening</div>
+        
+        <div class="transcript-container">
+            <div id="transcript" class="transcript">Click "Start Listening" to begin transcription...</div>
+        </div>
+        
+        <div class="info">
+            Make sure to allow microphone access when prompted. Works best in Chrome, Edge, or Safari.
+        </div>
+    </div>
+
+    <script>
+        // Check if the browser supports the Web Speech API
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            document.getElementById('transcript').innerHTML = 
+                '<div class="error">Sorry, your browser does not support the Web Speech API. Please try Chrome, Edge, or Safari.</div>';
+        } else {
+            // Initialize the speech recognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            
+            // Configure recognition settings
+            recognition.continuous = true;  // Keep listening
+            recognition.interimResults = true;  // Show interim results
+            recognition.lang = 'en-US';  // Set language
+            
+            // Get DOM elements
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const status = document.getElementById('status');
+            const transcript = document.getElementById('transcript');
+            
+            let finalTranscript = '';
+            let isListening = false;
+            
+            // Start listening
+            startBtn.addEventListener('click', () => {
+                if (!isListening) {
+                    recognition.start();
+                }
+            });
+            
+            // Stop listening
+            stopBtn.addEventListener('click', () => {
+                recognition.stop();
+            });
+            
+            // Clear transcript
+            clearBtn.addEventListener('click', () => {
+                finalTranscript = '';
+                transcript.innerHTML = 'Transcript cleared. Ready for new input...';
+            });
+            
+            // When recognition starts
+            recognition.onstart = () => {
+                isListening = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.textContent = '🎤 Listening... Speak now!';
+                status.className = 'status listening';
+                transcript.innerHTML = 'Listening...';
+            };
+            
+            // When recognition ends
+            recognition.onend = () => {
+                isListening = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                status.textContent = '⏹️ Stopped listening';
+                status.className = 'status stopped';
+            };
+            
+            // Handle recognition results
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                
+                // Process all results
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    const transcriptText = result[0].transcript;
+                    
+                    if (result.isFinal) {
+                        finalTranscript += transcriptText + ' ';
+                    } else {
+                        interimTranscript += transcriptText;
+                    }
+                }
+                
+                // Update the display
+                transcript.innerHTML = 
+                    '<span class="final">' + finalTranscript + '</span>' +
+                    '<span class="interim">' + interimTranscript + '</span>';
+                
+                // Auto-scroll to bottom
+                transcript.parentElement.scrollTop = transcript.parentElement.scrollHeight;
+            };
+            
+            // Handle errors
+            recognition.onerror = (event) => {
+                let errorMessage = 'Recognition error: ';
+                
+                switch(event.error) {
+                    case 'no-speech':
+                        errorMessage += 'No speech detected. Try speaking louder.';
+                        break;
+                    case 'audio-capture':
+                        errorMessage += 'No microphone found or microphone access denied.';
+                        break;
+                    case 'not-allowed':
+                        errorMessage += 'Microphone access denied. Please allow microphone access and try again.';
+                        break;
+                    case 'network':
+                        errorMessage += 'Network error - this usually means:<br>' +
+                                      '• Check your internet connection<br>' +
+                                      '• Try using HTTPS instead of HTTP<br>' +
+                                      '• Google\'s speech service might be temporarily unavailable<br>' +
+                                      '• Try refreshing the page and starting again';
+                        break;
+                    case 'service-not-allowed':
+                        errorMessage += 'Speech service not allowed. This page might need to be served over HTTPS.';
+                        break;
+                    default:
+                        errorMessage += event.error + ' - Try refreshing the page and ensuring you have a stable internet connection.';
+                        break;
+                }
+                
+                transcript.innerHTML = '<div class="error">' + errorMessage + '</div>';
+                status.textContent = '❌ Error occurred';
+                status.className = 'status stopped';
+                
+                // Reset buttons
+                isListening = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                
+                // Auto-retry after network error (with exponential backoff)
+                if (event.error === 'network') {
+                    setTimeout(() => {
+                        if (!isListening) {
+                            status.textContent = '🔄 Ready to retry - Click Start Listening';
+                            transcript.innerHTML += '<br><br>Ready to try again...';
+                        }
+                    }, 2000);
+                }
+            };
+        }
+    </script>
+</body>
+</html>
