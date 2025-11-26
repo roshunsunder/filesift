@@ -28,7 +28,7 @@ except ImportError as e:
 
 # Test configuration
 TEST_DIR = Path(__file__).parent / "test_directory"
-INDEX_DIR = Path(__file__).parent / "test_index"
+INDEX_DIR = Path(__file__).parent / "test_directory" / "test_index"
 MAX_RESULTS = 10
 
 def cleanup_test_index():
