@@ -68,7 +68,7 @@ class QueryDriver:
         """Load the vector store and BM25 index from disk"""
         path_obj = Path(path)
         try:
-            self.vector_store = FAISS.load_local(str(path_obj / "faiss_index"), self.embedding_model)
+            self.vector_store = FAISS.load_local(str(path_obj / "faiss_index"), self.embedding_model, allow_dangerous_deserialization=True)
         except Exception as e:
             self.logger.error(f"Error loading vector store: {str(e)}")
             raise

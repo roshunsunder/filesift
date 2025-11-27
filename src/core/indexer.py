@@ -283,7 +283,8 @@ class Indexer:
         try:
             self.vector_store = FAISS.load_local(
                 str(directory / "faiss_index"),
-                self.embedding_function
+                self.embedding_function,
+                allow_dangerous_deserialization=True
             )
         except Exception as e:
             self.logger.warning(f"Could not load vector store: {str(e)}")

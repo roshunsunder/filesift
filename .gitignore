@@ -5,3 +5,4 @@ env/
 faiss_index/
 __pycache__/
 node_modules/
+.searchindex/

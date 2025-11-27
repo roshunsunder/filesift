@@ -10,7 +10,7 @@ from src.config.settings import settings
 class CodeProcessor(BaseFileProcessor):
     """Processor for handling code files"""
     
-    def __init__(self, max_tokens_for_summary: int = 3000):
+    def __init__(self, max_tokens_for_summary: int = 2000):
         super().__init__()
         self.supported_extensions: Set[str] = {
             ".py", ".js", ".java", ".cpp", ".c", ".h", ".hpp",
@@ -69,7 +69,7 @@ class CodeProcessor(BaseFileProcessor):
             
             try:
                 response = self.client.chat.completions.create(
-                    model="qwen/qwen3-vl-8b",
+                    model="google/gemma-3-4b",
                     messages=messages,
                     temperature=0
                 )
