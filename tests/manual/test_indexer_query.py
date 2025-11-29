@@ -56,8 +56,7 @@ def test_initialization():
         query_driver = QueryDriver()
         print("✓ QueryDriver initialized successfully")
         print(f"  Embedding model: BAAI/bge-small-en-v1.5")
-        print(f"  Cache TTL: {query_driver.cache.ttl}")
-        
+
         return True, indexer, query_driver
         
     except Exception as e:

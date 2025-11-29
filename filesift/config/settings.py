@@ -32,10 +32,6 @@ class Settings:
         "venv", "env", ".env", "build", "dist"
     }
     
-    # Cache settings
-    ENABLE_CACHE: bool = os.getenv("ENABLE_CACHE", "True").lower() == "true"
-    CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))  # 1 hour default
-    
     @classmethod
     def validate(cls) -> Dict[str, Any]:
         """Validate the configuration and return any issues"""

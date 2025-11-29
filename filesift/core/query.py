@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import pickle
 import numpy as np
 
@@ -13,46 +13,26 @@ from rank_bm25 import BM25Okapi
 
 from ..config.settings import settings
 
+
 class SearchResult:
     """Represents a single search result"""
+
     def __init__(self, path: str, score: float, metadata: Dict[str, Any]):
         self.path = path
         self.score = score
         self.metadata = metadata
-        
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "path": self.path,
             "score": self.score,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
-class QueryCache:
-    """Simple in-memory cache for search results"""
-    def __init__(self, ttl_seconds: int = 3600):
-        self.cache: Dict[str, Dict[str, Any]] = {}
-        self.ttl = timedelta(seconds=ttl_seconds)
-        
-    def get(self, key: str) -> Optional[List[SearchResult]]:
-        if key not in self.cache:
-            return None
-            
-        entry = self.cache[key]
-        if datetime.now() - entry["timestamp"] > self.ttl:
-            del self.cache[key]
-            return None
-            
-        return entry["results"]
-        
-    def set(self, key: str, results: List[SearchResult]):
-        self.cache[key] = {
-            "timestamp": datetime.now(),
-            "results": results
-        }
 
 class QueryDriver:
-    """Enhanced query system with caching and filtering"""
-    
+    """Enhanced query system with filtering"""
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.embedding_model = SentenceTransformerEmbeddings(
@@ -61,17 +41,20 @@ class QueryDriver:
         self.vector_store: Optional[FAISS] = None
         self.bm25_index: Optional[BM25Okapi] = None
         self.bm25_documents: List[Document] = []
-        self.cache = QueryCache(ttl_seconds=settings.CACHE_TTL)
-        
+
     def load_from_disk(self, path: str):
         """Load the vector store and BM25 index from disk"""
         path_obj = Path(path)
         try:
-            self.vector_store = FAISS.load_local(str(path_obj / "faiss_index"), self.embedding_model, allow_dangerous_deserialization=True)
+            self.vector_store = FAISS.load_local(
+                str(path_obj / "faiss_index"),
+                self.embedding_model,
+                allow_dangerous_deserialization=True,
+            )
         except Exception as e:
             self.logger.error(f"Error loading vector store: {str(e)}")
             raise
-        
+
         # Load BM25 index and documents
         try:
             with open(path_obj / "bm25_index.pkl", "rb") as f:
@@ -86,13 +69,10 @@ class QueryDriver:
             self.logger.warning(f"Could not load BM25 index: {str(e)}")
             self.bm25_index = None
             self.bm25_documents = []
-            
-    def _create_cache_key(self, query: str, filters: Dict[str, Any]) -> str:
-        """Create a cache key from query and filters"""
-        filter_str = "&".join(f"{k}={v}" for k, v in sorted(filters.items()))
-        return f"{query}|{filter_str}"
         
-    def _apply_filters(self, results: List[SearchResult], filters: Dict[str, Any]) -> List[SearchResult]:
+    def _apply_filters(
+        self, results: List[SearchResult], filters: Dict[str, Any]
+    ) -> List[SearchResult]:
         """Apply filters to search results"""
         filtered = results
         
@@ -112,8 +92,13 @@ class QueryDriver:
                 
         return filtered
     
-    def _reciprocal_rank_fusion(self, semantic_results: List[tuple], bm25_results: List[int], 
-                                alpha: float = 0.5, k: int = 60) -> Dict[str, float]:
+    def _reciprocal_rank_fusion(
+        self,
+        semantic_results: List[tuple],
+        bm25_results: List[int],
+        alpha: float = 0.5,
+        k: int = 60,
+    ) -> Dict[str, float]:
         """
         Combine semantic and BM25 search results using Reciprocal Rank Fusion (RRF).
         
@@ -144,7 +129,9 @@ class QueryDriver:
         
         return rrf_scores
         
-    def search(self, query: str, filters: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
+    def search(
+        self, query: str, filters: Optional[Dict[str, Any]] = None
+    ) -> List[SearchResult]:
         """
         Search the vector store with optional filters
         
@@ -159,16 +146,9 @@ class QueryDriver:
         """
         if not self.vector_store:
             raise ValueError("Vector store not loaded")
-            
+
         filters = filters or {}
-        cache_key = self._create_cache_key(query, filters)
-        
-        # Check cache
-        if settings.ENABLE_CACHE:
-            cached_results = self.cache.get(cache_key)
-            if cached_results:
-                return cached_results
-        
+
         # Perform semantic search
         semantic_results = self.vector_store.similarity_search_with_score(
             query, k=settings.MAX_RESULTS * 2  # Get more candidates for hybrid search
@@ -222,9 +202,5 @@ class QueryDriver:
         
         # Apply filters
         results = self._apply_filters(results, filters)
-        
-        # Update cache
-        if settings.ENABLE_CACHE:
-            self.cache.set(cache_key, results)
-            
-        return results 
+
+        return results
