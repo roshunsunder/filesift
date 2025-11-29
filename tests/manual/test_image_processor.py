@@ -19,6 +19,11 @@ except ImportError as e:
     print("Make sure you're running from the project root directory")
     sys.exit(1)
 
+# Test configuration
+TEST_DIR = Path(__file__).parent / "test_directory"
+INDEX_DIR = Path(__file__).parent / "test_directory" / ".searchindex"
+MAX_RESULTS = 10
+
 def test_initialization():
     """Test ImageProcessor initialization"""
     print("=" * 60)
@@ -122,27 +127,24 @@ def test_process_with_image():
     try:
         processor = ImageProcessor()
         
-        # Look for test images in test_directory
-        test_dir = Path("test_directory")
-        
-        if not test_dir.exists():
-            print(f"⚠ Test directory not found: {test_dir}")
+        if not TEST_DIR.exists():
+            print(f"⚠ Test directory not found: {TEST_DIR}")
             print("  Create the directory and add test images to it.")
             return None
         
         # Find all image files in the test directory
         supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
         image_files = [
-            f for f in test_dir.iterdir()
+            f for f in TEST_DIR.iterdir()
             if f.is_file() and f.suffix.lower() in supported_extensions
         ]
         
         if not image_files:
-            print(f"⚠ No image files found in {test_dir}")
+            print(f"⚠ No image files found in {TEST_DIR}")
             print("  Supported formats: jpg, jpeg, png, gif, bmp, webp")
             return None
         
-        print(f"Found {len(image_files)} image file(s) in {test_dir}")
+        print(f"Found {len(image_files)} image file(s) in {TEST_DIR}")
         
         # Process all images found
         all_passed = True
@@ -288,13 +290,12 @@ def test_api_response_structure():
             return None
         
         # Test that we can encode an image from test_directory
-        test_dir = Path("test_directory")
         image_path = None
         
-        if test_dir.exists():
+        if TEST_DIR.exists():
             supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
             image_files = [
-                f for f in test_dir.iterdir()
+                f for f in TEST_DIR.iterdir()
                 if f.is_file() and f.suffix.lower() in supported_extensions
             ]
             if image_files:
@@ -310,7 +311,7 @@ def test_api_response_structure():
             except Exception as e:
                 print(f"⚠ Could not encode image: {e}")
         else:
-            print(f"⚠ No test image found in {test_dir} for API structure test")
+            print(f"⚠ No test image found in {TEST_DIR} for API structure test")
         
         print("\n✓ OpenAI API integration test (informational)")
         return True
