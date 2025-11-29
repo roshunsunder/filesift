@@ -1,5 +1,7 @@
 home/
 env/
+dist/
+*.egg-info/
 .env
 .DS_Store
 faiss_index/
