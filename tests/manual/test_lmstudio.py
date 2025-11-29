@@ -176,7 +176,7 @@ def main():
     results.append(("Basic Completion", test_basic_completion()))
     results.append(("Chat Completion", test_chat_completion()))
     results.append(("Code Summarization", test_code_summarization()))
-    # results.append(("Image Processing", test_image_processing()))
+    results.append(("Image Processing", test_image_processing()))
     
     # Summary
     print("=" * 60)
