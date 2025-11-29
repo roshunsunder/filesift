@@ -24,6 +24,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = []
 
-[tool.setuptools]
-packages = ["src"]
+[project.scripts]
+filesift = "filesift.cli.command:main"
 
+[tool.setuptools.packages.find]
+include = ["filesift*"]
