@@ -6,5 +6,4 @@ sentence-transformers
 openai
 python-dotenv
 tiktoken
-lmstudio
 rank-bm25

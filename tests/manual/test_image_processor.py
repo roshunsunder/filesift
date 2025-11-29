@@ -45,7 +45,8 @@ def test_initialization():
     except ImportError as e:
         print(f"✗ Initialization test failed: {str(e)}")
         print("\nTroubleshooting:")
-        print("1. Install lmstudio package: pip install lmstudio")
+        print("1. Install openai package: pip install openai")
+        print("2. Make sure LM Studio is running with OpenAI-compatible API enabled")
         return False
     except Exception as e:
         print(f"✗ Initialization test failed: {str(e)}")
@@ -207,9 +208,10 @@ def test_process_with_image():
         print("\nTroubleshooting:")
         print("1. Make sure LM Studio is running")
         print("2. Make sure a VLM (Vision-Language Model) is loaded in LM Studio")
-        print("3. Verify the image file exists and is readable")
-        print("4. Check that the image format is supported (JPEG, PNG, WebP)")
-        print("5. Try specifying a model: processor = ImageProcessor(model_name='google/gemma-3-1b')")
+        print("3. Make sure the OpenAI-compatible API is enabled in LM Studio")
+        print("4. Verify the image file exists and is readable")
+        print("5. Check that the image format is supported (JPEG, PNG, WebP)")
+        print("6. Try specifying a model: processor = ImageProcessor(model_name='google/gemma-3-1b')")
         return False
 
 def test_error_handling():
@@ -266,26 +268,26 @@ def test_error_handling():
         return False
 
 def test_api_response_structure():
-    """Test that the LM Studio API response is handled correctly"""
+    """Test that the OpenAI API integration is working correctly"""
     print("\n" + "=" * 60)
-    print("Test 5: LM Studio API Integration")
+    print("Test 5: OpenAI API Integration")
     print("=" * 60)
     
     try:
-        import lmstudio as lms
+        from openai import OpenAI
         
-        # Test that we can initialize the model
-        print("Testing LM Studio connection...")
+        # Test that we can initialize the OpenAI client
+        print("Testing OpenAI API connection...")
         try:
-            model = lms.llm()
-            print("✓ LM Studio connection successful")
-            print(f"  Model type: {type(model)}")
+            client = OpenAI(api_key="lm-studio", base_url="http://localhost:1234/v1")
+            print("✓ OpenAI client initialized successfully")
+            print("  Using LM Studio's OpenAI-compatible API endpoint")
         except Exception as e:
-            print(f"⚠ Could not connect to LM Studio: {e}")
-            print("  Make sure LM Studio is running and a model is loaded")
+            print(f"⚠ Could not initialize OpenAI client: {e}")
+            print("  Make sure LM Studio is running with OpenAI-compatible API enabled")
             return None
         
-        # Test that we can prepare an image from test_directory
+        # Test that we can encode an image from test_directory
         test_dir = Path("test_directory")
         image_path = None
         
@@ -300,20 +302,22 @@ def test_api_response_structure():
         
         if image_path:
             try:
-                image_handle = lms.prepare_image(str(image_path))
-                print(f"✓ Image preparation successful: {image_path}")
-                print(f"  Image handle type: {type(image_handle)}")
+                import base64
+                with open(image_path, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+                print(f"✓ Image encoding successful: {image_path}")
+                print(f"  Base64 length: {len(base64_image)} characters")
             except Exception as e:
-                print(f"⚠ Could not prepare image: {e}")
+                print(f"⚠ Could not encode image: {e}")
         else:
             print(f"⚠ No test image found in {test_dir} for API structure test")
         
-        print("\n✓ LM Studio API integration test (informational)")
+        print("\n✓ OpenAI API integration test (informational)")
         return True
         
     except ImportError:
-        print("⚠ Skipping: lmstudio package not installed")
-        print("  Install it with: pip install lmstudio")
+        print("⚠ Skipping: openai package not installed")
+        print("  Install it with: pip install openai")
         return None
     except Exception as e:
         print(f"✗ API integration test failed: {str(e)}")
@@ -329,9 +333,10 @@ def main():
     print("\nPrerequisites:")
     print("1. LM Studio must be installed and running")
     print("2. A VLM (Vision-Language Model) must be loaded in LM Studio")
-    print("   (e.g., google/gemma-3-1b - download with: lms get google/gemma-3-1b)")
-    print("3. Test images in test_directory/ (jpg, png, webp, etc.)")
-    print("4. lmstudio package installed: pip install lmstudio")
+    print("   (e.g., google/gemma-3-1b)")
+    print("3. OpenAI-compatible API must be enabled in LM Studio")
+    print("4. Test images in test_directory/ (jpg, png, webp, etc.)")
+    print("5. openai package installed: pip install openai")
     print("\n")
     
     results = []

@@ -1,66 +1,71 @@
 from pathlib import Path
 from typing import Dict, Any, Set, Optional
+import base64
+from openai import OpenAI
+
 from .base import BaseFileProcessor
 
-try:
-    import lmstudio as lms
-except ImportError:
-    lms = None
-
-def extract_text(result):
-    """Extract text from a PredictionResult or other response object"""
-    if hasattr(result, 'text'):
-        return result.text
-    elif hasattr(result, 'content'):
-        return result.content
-    elif hasattr(result, 'message'):
-        msg = result.message
-        if hasattr(msg, 'content'):
-            return msg.content
-        return str(msg)
-    else:
-        return str(result)
-
 class ImageProcessor(BaseFileProcessor):
-    """Processor for handling image files using local LM Studio VLM"""
+    """Processor for handling image files using local LM Studio VLM via OpenAI API"""
     
     def __init__(self, model_name: Optional[str] = None):
         super().__init__()
-        if lms is None:
-            raise ImportError(
-                "lmstudio package is required for ImageProcessor. "
-                "Install it with: pip install lmstudio"
-            )
-        self.model_name = model_name
+        self.model_name = model_name or "google/gemma-3-4b"
         # LM Studio supports JPEG, PNG, and WebP, but we'll keep broader support
         # for files that might be converted or handled elsewhere
         self.supported_extensions: Set[str] = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+        self.client = OpenAI(api_key="lm-studio", base_url="http://localhost:1234/v1")
+        
+    def _encode_image(self, image_path: Path) -> str:
+        """Encode image to base64 string"""
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode("utf-8")
+    
+    def _get_image_mime_type(self, file_path: Path) -> str:
+        """Get MIME type based on file extension"""
+        ext = file_path.suffix.lower()
+        mime_types = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp"
+        }
+        return mime_types.get(ext, "image/jpeg")
         
     def can_handle(self, file_path: Path) -> bool:
         return file_path.suffix.lower() in self.supported_extensions
     
     def process(self, file_path: Path) -> Dict[str, Any]:
-        """Process an image file using LM Studio VLM for captioning"""
+        """Process an image file using LM Studio VLM for captioning via OpenAI API"""
         try:
-            # Prepare the image for LM Studio
-            image_handle = lms.prepare_image(str(file_path))
+            # Encode image to base64
+            base64_image = self._encode_image(file_path)
+            mime_type = self._get_image_mime_type(file_path)
             
-            # Initialize model (use specified model or default to loaded model)
-            if self.model_name:
-                model = lms.llm(self.model_name)
-            else:
-                model = lms.llm()  # Uses currently loaded model in LM Studio
-            
-            # Create chat and add image with prompt
-            chat = lms.Chat()
+            # Create prompt for image description
             prompt = "Describe this image in detail, focusing on key visual elements, objects, people, text, colors, and any important details that would be useful for search and retrieval."
-            chat.add_user_message(prompt, images=[image_handle])
             
-            # Get response from model
-            prediction = model.respond(chat)
+            # Use OpenAI API format for vision models
+            response = self.client.responses.create(
+                model=self.model_name,
+                input=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": prompt},
+                            {
+                                "type": "input_image",
+                                "image_url": f"data:{mime_type};base64,{base64_image}",
+                            },
+                        ],
+                    }
+                ],
+            )
             
-            # Extract text from response
-            description = extract_text(prediction)
+            # Extract description from response
+            description = response.output_text
+            print(description)
             
             return {
                 "content": description,
