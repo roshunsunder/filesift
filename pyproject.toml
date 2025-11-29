@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "filesift"
+version = "0.1.0"
+description = "Intelligent file indexing and search system"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask",
+    "flask-cors",
+    "langchain-community",
+    "faiss-cpu",
+    "sentence-transformers",
+    "openai",
+    "python-dotenv",
+    "tiktoken",
+    "lmstudio",
+    "rank-bm25",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[tool.setuptools]
+packages = ["src"]
+
