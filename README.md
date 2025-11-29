@@ -39,7 +39,7 @@ DEBUG_MODE=False
 
 4. Run the server:
 ```bash
-python -m src.api.server
+python -m filesift.api.server
 ```
 
 ## API Endpoints

@@ -13,7 +13,7 @@ from typing import Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    from src.core.file_processors.image_processor import ImageProcessor
+    from filesift.core.file_processors.image_processor import ImageProcessor
 except ImportError as e:
     print(f"ERROR: Could not import ImageProcessor: {e}")
     print("Make sure you're running from the project root directory")
