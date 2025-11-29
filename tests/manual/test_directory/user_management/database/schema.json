@@ -1,0 +1,108 @@
+{
+  "version": "1.0.0",
+  "database": "app_database",
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "SERIAL",
+          "primaryKey": true
+        },
+        {
+          "name": "username",
+          "type": "VARCHAR(80)",
+          "unique": true,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(120)",
+          "unique": true,
+          "nullable": false
+        },
+        {
+          "name": "password_hash",
+          "type": "VARCHAR(255)",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "BOOLEAN",
+          "default": true
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_users_email",
+          "columns": ["email"]
+        },
+        {
+          "name": "idx_users_username",
+          "columns": ["username"]
+        }
+      ]
+    },
+    {
+      "name": "posts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "SERIAL",
+          "primaryKey": true
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "foreignKey": {
+            "table": "users",
+            "column": "id",
+            "onDelete": "CASCADE"
+          }
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(255)",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "VARCHAR(255)",
+          "unique": true,
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "default": "draft"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_posts_user_id",
+          "columns": ["user_id"]
+        },
+        {
+          "name": "idx_posts_slug",
+          "columns": ["slug"]
+        }
+      ]
+    }
+  ]
+}

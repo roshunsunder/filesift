@@ -1,0 +1,27 @@
+{
+  "name": "user-management-app",
+  "version": "1.0.0",
+  "description": "A full-stack user management application",
+  "main": "index.js",
+  "scripts": {
+    "start": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "test": "cd frontend && npm test",
+    "backend": "cd backend && python app.py",
+    "dev": "concurrently \"npm run backend\" \"npm run start\"",
+    "lint": "cd frontend && eslint src --ext .ts,.tsx",
+    "format": "cd frontend && prettier --write \"src/**/*.{ts,tsx,css}\""
+  },
+  "keywords": [
+    "user-management",
+    "react",
+    "typescript",
+    "flask",
+    "postgresql"
+  ],
+  "author": "Development Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
