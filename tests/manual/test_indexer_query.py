@@ -271,7 +271,7 @@ def test_hybrid_search(query_driver: QueryDriver):
         # Test queries that should benefit from hybrid search
         test_queries = [
             ("python code", "Should match Python files via BM25"),
-            ("image of sprite", "Should match image files"),
+            ("dog picture", "Should match image files"),
             ("function", "Should match code with functions"),
         ]
         
