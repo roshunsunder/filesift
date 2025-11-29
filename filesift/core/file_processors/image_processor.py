@@ -65,7 +65,6 @@ class ImageProcessor(BaseFileProcessor):
             
             # Extract description from response
             description = response.output_text
-            print(description)
             
             return {
                 "content": description,

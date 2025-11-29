@@ -39,7 +39,7 @@ def test_initialization():
         
         # Test with specific model name
         try:
-            processor_named = ImageProcessor(model_name="google/gemma-3-1b")
+            processor_named = ImageProcessor(model_name="google/gemma-3-4b")
             print("✓ ImageProcessor initialized successfully (named model)")
             print(f"  Model name: {processor_named.model_name}")
         except Exception as e:
