@@ -14,7 +14,8 @@ class CodeProcessor(BaseFileProcessor):
         super().__init__()
         self.supported_extensions: Set[str] = {
             ".py", ".js", ".java", ".cpp", ".c", ".h", ".hpp",
-            ".cs", ".rb", ".go", ".rs", ".ts", ".php", ".swift"
+            ".cs", ".rb", ".go", ".rs", ".ts", ".php", ".swift",
+            ".html"
         }
         self.client = OpenAI(api_key="lm-studio", base_url="http://localhost:1234/v1")
         # Reserve tokens for prompt and response (4096 - 3000 = 1096 for prompt + response)
