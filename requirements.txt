@@ -1,17 +1,10 @@
 flask
 flask-cors
-langchain
 langchain-community
 faiss-cpu
 sentence-transformers
 openai
 python-dotenv
-requests
 tiktoken
-typing-extensions
-pathlib
-python-dateutil
-
 lmstudio
-pillow
 rank-bm25

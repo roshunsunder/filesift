@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import logging
 from datetime import datetime, timedelta
-import openai
 import pickle
 import numpy as np
 
