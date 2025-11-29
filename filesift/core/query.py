@@ -111,22 +111,47 @@ class QueryDriver:
         Returns:
             Dictionary mapping document paths to combined RRF scores
         """
+        # We want intuitive, per-file behavior: each file should contribute at most
+        # once per ranking source (semantic and BM25), regardless of how many chunks
+        # it produced. To achieve this, we:
+        #   1. Track the *best* (lowest) rank per file path for semantic results.
+        #   2. Track the best rank per file path for BM25 results.
+        #   3. Compute a single RRF contribution per file per source.
+        #
+        # This avoids over‑rewarding large, heavily-chunked files compared to small
+        # files like single-caption images.
         rrf_scores: Dict[str, float] = {}
-        
-        # Add semantic search scores
+
+        # Best rank per path from semantic search
+        semantic_best_ranks: Dict[str, int] = {}
         for rank, (doc, _) in enumerate(semantic_results):
             doc_path = doc.metadata.get("path", "")
-            if doc_path:
-                rrf_scores[doc_path] = rrf_scores.get(doc_path, 0) + alpha / (k + rank + 1)
-        
-        # Add BM25 search scores
+            if not doc_path:
+                continue
+            # Keep the best (lowest) rank seen for this file
+            if doc_path not in semantic_best_ranks:
+                semantic_best_ranks[doc_path] = rank
+
+        # Best rank per path from BM25 search
+        bm25_best_ranks: Dict[str, int] = {}
         for rank, doc_idx in enumerate(bm25_results):
-            if doc_idx < len(self.bm25_documents):
-                doc = self.bm25_documents[doc_idx]
-                doc_path = doc.metadata.get("path", "")
-                if doc_path:
-                    rrf_scores[doc_path] = rrf_scores.get(doc_path, 0) + (1 - alpha) / (k + rank + 1)
-        
+            if doc_idx >= len(self.bm25_documents):
+                continue
+            doc = self.bm25_documents[doc_idx]
+            doc_path = doc.metadata.get("path", "")
+            if not doc_path:
+                continue
+            if doc_path not in bm25_best_ranks:
+                bm25_best_ranks[doc_path] = rank
+
+        # Add semantic contributions
+        for doc_path, rank in semantic_best_ranks.items():
+            rrf_scores[doc_path] = rrf_scores.get(doc_path, 0.0) + alpha / (k + rank + 1)
+
+        # Add BM25 contributions
+        for doc_path, rank in bm25_best_ranks.items():
+            rrf_scores[doc_path] = rrf_scores.get(doc_path, 0.0) + (1 - alpha) / (k + rank + 1)
+
         return rrf_scores
         
     def search(
@@ -170,10 +195,14 @@ class QueryDriver:
             rrf_scores = self._reciprocal_rank_fusion(semantic_results, bm25_top_k)
             
             # Create a mapping of path -> (doc, semantic_score) for easy lookup
-            semantic_map = {
-                doc.metadata.get("path", ""): (doc, 1.0 - score)
-                for doc, score in semantic_results
-            }
+            semantic_map: Dict[str, tuple[Document, float]] = {}
+            for doc, score in semantic_results:
+                path = doc.metadata.get("path", "")
+                if not path:
+                    continue
+                # Keep the first (best-ranked) semantic document per path
+                if path not in semantic_map:
+                    semantic_map[path] = (doc, 1.0 - score)
             
             # Sort by RRF score and create SearchResult objects
             sorted_paths = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)

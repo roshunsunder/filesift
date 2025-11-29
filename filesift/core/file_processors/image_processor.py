@@ -13,7 +13,7 @@ class ImageProcessor(BaseFileProcessor):
         self.model_name = model_name or "google/gemma-3-4b"
         # LM Studio supports JPEG, PNG, and WebP, but we'll keep broader support
         # for files that might be converted or handled elsewhere
-        self.supported_extensions: Set[str] = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+        self.supported_extensions: Set[str] = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
         self.client = OpenAI(api_key="lm-studio", base_url="http://localhost:1234/v1")
         
     def _encode_image(self, image_path: Path) -> str:

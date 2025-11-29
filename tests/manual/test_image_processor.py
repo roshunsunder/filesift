@@ -75,7 +75,6 @@ def test_can_handle():
             Path("test.jpeg"),
             Path("test.png"),
             Path("test.gif"),
-            Path("test.bmp"),
             Path("test.webp"),
         ]
         
@@ -133,7 +132,7 @@ def test_process_with_image():
             return None
         
         # Find all image files in the test directory
-        supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+        supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
         image_files = [
             f for f in TEST_DIR.iterdir()
             if f.is_file() and f.suffix.lower() in supported_extensions
@@ -141,7 +140,7 @@ def test_process_with_image():
         
         if not image_files:
             print(f"⚠ No image files found in {TEST_DIR}")
-            print("  Supported formats: jpg, jpeg, png, gif, bmp, webp")
+            print("  Supported formats: jpg, jpeg, png, gif, webp")
             return None
         
         print(f"Found {len(image_files)} image file(s) in {TEST_DIR}")
@@ -293,7 +292,7 @@ def test_api_response_structure():
         image_path = None
         
         if TEST_DIR.exists():
-            supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+            supported_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
             image_files = [
                 f for f in TEST_DIR.iterdir()
                 if f.is_file() and f.suffix.lower() in supported_extensions
