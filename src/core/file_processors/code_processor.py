@@ -69,7 +69,7 @@ class CodeProcessor(BaseFileProcessor):
             
             try:
                 response = self.client.chat.completions.create(
-                    model="google/gemma-3-4b",
+                    model="google/gemma-3-1b",
                     messages=messages,
                     temperature=0
                 )

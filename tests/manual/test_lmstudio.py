@@ -38,7 +38,7 @@ def test_basic_completion():
     try:
         # Initialize model - you may need to adjust the model name
         # Check what models you have loaded in LM Studio
-        model = lms.llm("google/gemma-3-4b")
+        model = lms.llm("google/gemma-3-1b")
         print("✓ Model initialized successfully")
         
         # Test simple completion
@@ -76,7 +76,7 @@ def test_chat_completion():
     print("=" * 60)
     
     try:
-        model = lms.llm("google/gemma-3-4b")
+        model = lms.llm("google/gemma-3-1b")
         print("✓ Model initialized successfully")
         
         # Test chat functionality - inspect Chat object structure
@@ -131,7 +131,7 @@ def test_code_summarization():
     print("=" * 60)
     
     try:
-        model = lms.llm("google/gemma-3-4b")
+        model = lms.llm("google/gemma-3-1b")
         print("✓ Model initialized successfully")
         
         # Simulate what CodeProcessor does
@@ -190,7 +190,7 @@ def test_model_listing():
     
     try:
         # Try to get model info
-        model = lms.llm("google/gemma-3-4b")
+        model = lms.llm("google/gemma-3-1b")
         print("✓ Model initialized")
         print(f"Model type: {type(model)}")
         print("\nNote: Check LM Studio UI to see which model is currently loaded")

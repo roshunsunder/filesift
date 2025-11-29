@@ -34,7 +34,7 @@ def test_initialization():
         
         # Test with specific model name
         try:
-            processor_named = ImageProcessor(model_name="google/gemma-3-4b")
+            processor_named = ImageProcessor(model_name="google/gemma-3-1b")
             print("✓ ImageProcessor initialized successfully (named model)")
             print(f"  Model name: {processor_named.model_name}")
         except Exception as e:
@@ -209,7 +209,7 @@ def test_process_with_image():
         print("2. Make sure a VLM (Vision-Language Model) is loaded in LM Studio")
         print("3. Verify the image file exists and is readable")
         print("4. Check that the image format is supported (JPEG, PNG, WebP)")
-        print("5. Try specifying a model: processor = ImageProcessor(model_name='google/gemma-3-4b')")
+        print("5. Try specifying a model: processor = ImageProcessor(model_name='google/gemma-3-1b')")
         return False
 
 def test_error_handling():
@@ -329,7 +329,7 @@ def main():
     print("\nPrerequisites:")
     print("1. LM Studio must be installed and running")
     print("2. A VLM (Vision-Language Model) must be loaded in LM Studio")
-    print("   (e.g., google/gemma-3-4b - download with: lms get google/gemma-3-4b)")
+    print("   (e.g., google/gemma-3-1b - download with: lms get google/gemma-3-1b)")
     print("3. Test images in test_directory/ (jpg, png, webp, etc.)")
     print("4. lmstudio package installed: pip install lmstudio")
     print("\n")
