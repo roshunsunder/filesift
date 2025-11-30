@@ -7,8 +7,8 @@ import hashlib
 import pickle
 import re
 
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores.faiss import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
@@ -52,7 +52,7 @@ class Indexer:
         self.metadata = IndexMetadata(root)
         
         # Initialize embedding function
-        self.embedding_function = SentenceTransformerEmbeddings(
+        self.embedding_function = HuggingFaceEmbeddings(
             model_name="BAAI/bge-small-en-v1.5"
         )
         
