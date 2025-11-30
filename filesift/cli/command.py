@@ -28,13 +28,6 @@ def index(path: Path):
     """Index a directory for search"""
     index_dir = path / ".filesift"
     
-    # Check if index already exists
-    if index_dir.exists() and any(index_dir.iterdir()):
-        # Prompt for confirmation
-        if not click.confirm("An index already exists for this directory, do you want to re-index?", default=True):
-            click.echo("Indexing cancelled.")
-            return
-    
     try:
         from filesift._core.indexer import Indexer
     except ImportError:
