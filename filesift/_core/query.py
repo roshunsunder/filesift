@@ -5,12 +5,7 @@ from datetime import datetime
 import pickle
 import numpy as np
 
-from langchain_community.vectorstores.faiss import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
-
 from langchain_core.documents import Document
-from rank_bm25 import BM25Okapi
-
 from filesift._config.settings import settings
 
 
@@ -34,6 +29,14 @@ class QueryDriver:
     """Enhanced query system with filtering"""
 
     def __init__(self):
+        try:
+            from langchain_community.vectorstores.faiss import FAISS
+            from langchain_huggingface import HuggingFaceEmbeddings
+            from rank_bm25 import BM25Okapi
+        except ImportError:
+            print("Failed to find necessary libraries, QueryDriver ctor failed.")
+            return
+        
         self.logger = logging.getLogger(__name__)
         self.embedding_model = HuggingFaceEmbeddings(
             model_name="BAAI/bge-small-en-v1.5"
@@ -45,6 +48,11 @@ class QueryDriver:
     def load_from_disk(self, path: str):
         """Load the vector store and BM25 index from disk"""
         path_obj = Path(path)
+        try:
+            from langchain_community.vectorstores.faiss import FAISS
+        except ImportError:
+            print("Could not load FAISS, aborting.")
+            return
         try:
             self.vector_store = FAISS.load_local(
                 str(path_obj / "faiss_index"),
