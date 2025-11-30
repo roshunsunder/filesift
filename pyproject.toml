@@ -12,6 +12,7 @@ dependencies = [
     "flask",
     "flask-cors",
     "langchain-community",
+    "langchain_huggingface",
     "faiss-cpu",
     "sentence-transformers",
     "openai",
