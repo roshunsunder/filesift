@@ -148,6 +148,7 @@ class Indexer:
                 chunks = self.text_splitter.split_text(content)
             
             # Enrich metadata with additional searchable fields
+            file_path_str = str(file_path)
             enriched_metadata = {
                 **result["metadata"],
                 "file_type": result["file_type"],
@@ -156,7 +157,8 @@ class Indexer:
                 "filename_stem": file_path.stem,
                 "extension": file_path.suffix,
                 "parent_dir": file_path.parent.name,
-                "full_path": str(file_path),
+                "full_path": file_path_str,
+                "path": file_path_str,  # Also set "path" for query driver compatibility
             }
             
             # Extract year and keywords

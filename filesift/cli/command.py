@@ -12,14 +12,63 @@ def cli():
 
 @cli.command()
 @click.argument("query", required=True)
-def find(query: str):
+@click.option("--path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+              help="Directory to search in (defaults to current directory)")
+def find(query: str, path: Optional[Path]):
     """Search for files using a query string"""
-    # TODO: Implement search functionality
-    # - Load index from .filesift directory
-    # - Use QueryDriver to search
-    # - Display results
-    click.echo(f"Searching for: {query}")
-    pass
+    # Determine the directory to search in
+    if path:
+        search_dir = Path(path)
+    else:
+        search_dir = Path.cwd()
+    
+    index_dir = search_dir / ".filesift"
+    
+    # Check if index exists
+    if not index_dir.exists() or not any(index_dir.iterdir()):
+        click.echo(f"Error: No index found in {search_dir}", err=True)
+        click.echo(f"\nTo create an index, run:", err=True)
+        click.echo(f"  filesift index {search_dir}", err=True)
+        raise click.Abort()
+    
+    try:
+        from filesift._core.query import QueryDriver
+    except ImportError:
+        click.echo("Error: Couldn't load QueryDriver. Aborting...", err=True)
+        raise click.Abort()
+    
+    try:
+        # Load the index
+        print("Loading index...")
+        query_driver = QueryDriver()
+        query_driver.load_from_disk(str(index_dir))
+        
+        # Perform hybrid search
+        click.echo(f"Searching for: {query}")
+        results = query_driver.search(query)
+        
+        # Display results
+        if not results:
+            click.echo("No results found.")
+            return
+        
+        click.echo(f"\nFound {len(results)} result(s):\n")
+        for i, result in enumerate(results, 1):
+            # Format the result nicely
+            click.echo(f"{i}. {result.path}")
+            
+            # Show relevant metadata if available
+            metadata_parts = []
+            if result.metadata.get("file_type"):
+                metadata_parts.append(f"Type: {result.metadata['file_type']}")
+            
+            if metadata_parts:
+                click.echo(f"   {' | '.join(metadata_parts)}")
+            click.echo()
+        
+    except Exception as e:
+        click.echo(f"Error during search: {e}", err=True)
+        raise click.Abort()
 
 
 @cli.command()
