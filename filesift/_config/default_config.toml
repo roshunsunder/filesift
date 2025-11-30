@@ -1,0 +1,68 @@
+# Default configuration file for FileSift
+# These values can be overridden by environment variables
+
+# Path settings
+[paths]
+
+# Index directory name (stored within .filesift directory)
+INDEX_DIR_NAME = "faiss_index"
+
+# Model settings
+[models]
+# Embedding model for semantic search
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+
+# Image processing model (for LM Studio VLM)
+IMAGE_MODEL = "google/gemma-3-4b"
+
+# Code processing model (for LM Studio)
+CODE_MODEL = "google/gemma-3-1b"
+
+# LM Studio settings
+[lm_studio]
+# Base URL for LM Studio API
+BASE_URL = "http://localhost:1234/v1"
+
+# API key for LM Studio (typically "lm-studio" for local instances)
+API_KEY = "lm-studio"
+
+# API Keys
+[api_keys]
+# OpenAI API key (for external OpenAI API usage)
+OPENAI_API_KEY = ""
+
+# Hugging Face bearer token (for Hugging Face API usage)
+HF_BEARER_TOKEN = ""
+
+# Server settings
+[server]
+
+# Search settings
+[search]
+# Maximum number of results to return
+MAX_RESULTS = 10
+
+# Similarity threshold for filtering results (0.0 to 1.0)
+SIMILARITY_THRESHOLD = 0.7
+
+# Indexing settings
+[indexing]
+# Chunk size for text splitting
+CHUNK_SIZE = 1000
+
+# Overlap between chunks
+CHUNK_OVERLAP = 200
+
+# Directories to exclude from indexing
+EXCLUDED_DIRS = [
+    ".git",
+    "node_modules",
+    "__pycache__",
+    "venv",
+    "env",
+    ".env",
+    "build",
+    "dist",
+    ".filesift"
+]
+
