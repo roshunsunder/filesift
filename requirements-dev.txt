@@ -8,3 +8,4 @@ python-dotenv
 tiktoken
 rank-bm25
 click
+build
