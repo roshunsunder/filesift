@@ -29,7 +29,8 @@ class Settings:
     # File type settings
     EXCLUDED_DIRS: Set[str] = {
         ".git", "node_modules", "__pycache__", 
-        "venv", "env", ".env", "build", "dist"
+        "venv", "env", ".env", "build", "dist",
+        ".filesift"
     }
     
     @classmethod
