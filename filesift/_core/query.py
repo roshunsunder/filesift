@@ -11,7 +11,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
-from ..config.settings import settings
+from filesift._config.settings import settings
 
 
 class SearchResult:

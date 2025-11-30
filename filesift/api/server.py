@@ -5,9 +5,9 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from ..core.indexer import Indexer
-from ..core.query import QueryDriver
-from ..config.settings import settings
+from filesift._core.indexer import Indexer
+from filesift._core.query import QueryDriver
+from filesift._config.settings import settings
 
 # Configure logging
 logging.basicConfig(

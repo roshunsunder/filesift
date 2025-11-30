@@ -5,7 +5,7 @@ from langchain_community.document_loaders import TextLoader
 import tiktoken
 
 from .base import BaseFileProcessor
-from filesift.config.settings import settings
+from filesift._config.settings import settings
 
 class CodeProcessor(BaseFileProcessor):
     """Processor for handling code files"""

@@ -13,7 +13,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
-from ..config.settings import settings
+from filesift._config.settings import settings
+
 from .file_processors.base import BaseFileProcessor
 from .file_processors.code_processor import CodeProcessor
 from .file_processors.image_processor import ImageProcessor

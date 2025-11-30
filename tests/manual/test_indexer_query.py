@@ -19,8 +19,8 @@ from typing import List, Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    from filesift.core.indexer import Indexer
-    from filesift.core.query import QueryDriver
+    from filesift._core.indexer import Indexer
+    from filesift._core.query import QueryDriver
 except ImportError as e:
     print(f"ERROR: Could not import modules: {e}")
     print("Make sure you're running from the project root directory")
