@@ -12,6 +12,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
+from tqdm import tqdm
 
 from filesift._config.settings import settings
 
@@ -188,6 +189,8 @@ class Indexer:
         """Index the filesystem, updating only changed files"""
         documents = []
         
+        # First pass: collect all indexable files
+        indexable_files = []
         for file_path in self.root.rglob("*"):
             # Skip directories and excluded paths
             if file_path.is_dir() or any(excluded in str(file_path) 
@@ -197,7 +200,50 @@ class Indexer:
             # Check if file needs indexing
             if not self.needs_indexing(file_path):
                 continue
-                
+            
+            if self.get_processor(file_path):
+                indexable_files.append(file_path)
+        
+        # Print count of indexable files
+        print(f"\nFound {len(indexable_files)} indexable file(s)")
+        
+        if not indexable_files:
+            print("No files to index.")
+            return
+        
+        # Create a static "description line" above the real progress bar
+        desc_line = tqdm(
+            total=1,
+            position=0,
+            bar_format="{desc}",  # show only the description text, no bar
+            leave=True           # do not leave it printed after completion
+        )
+
+        # Actual progress bar
+        pbar = tqdm(
+            total=len(indexable_files),
+            position=1,
+            desc="",
+            unit="file",
+            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}'
+        )
+        
+        # Second pass: process files with progress bar
+        for file_path in indexable_files:
+            # Update progress bar description with current file
+            try:
+                relative_path = file_path.relative_to(self.root)
+            except ValueError:
+                relative_path = file_path
+            
+            # Truncate long paths for display (max 60 chars)
+            path_str = str(relative_path)
+            if len(path_str) > 60:
+                path_str = "..." + path_str[-(60-3):]
+            
+            desc_line.set_description_str(f"Indexing {path_str}:")
+            desc_line.refresh()
+            
             # Process the file (returns list of Documents/chunks)
             file_path_str = str(file_path)
             docs = self.process_file(file_path)
@@ -224,6 +270,12 @@ class Indexer:
                 start_idx = len(self.bm25_documents)
                 self.bm25_documents.extend(docs)
                 self.bm25_file_mapping[file_path_str] = list(range(start_idx, len(self.bm25_documents)))
+            
+            # Update progress bar
+            pbar.update(1)
+        
+        pbar.close()
+        desc_line.close()
                 
         # Update or create vector store
         if self.vector_store is None and documents:

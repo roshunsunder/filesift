@@ -20,6 +20,7 @@ dependencies = [
     "tiktoken",
     "rank-bm25",
     "click",
+    "tqdm"
 ]
 
 [project.optional-dependencies]
