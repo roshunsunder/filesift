@@ -8,3 +8,4 @@ tiktoken
 rank-bm25
 click
 tqdm
+platformdirs

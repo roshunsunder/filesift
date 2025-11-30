@@ -18,7 +18,8 @@ dependencies = [
     "tiktoken",
     "rank-bm25",
     "click",
-    "tqdm"
+    "tqdm",
+    "platformdirs"
 ]
 
 [project.optional-dependencies]
