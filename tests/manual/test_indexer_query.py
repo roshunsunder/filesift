@@ -12,6 +12,7 @@ This script tests indexing and querying functionality including:
 import sys
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -448,7 +449,11 @@ def main():
     print("      (code files, images, etc.) before running tests.\n")
     
     # Initialize
+    start_time = time.time()
     success, indexer, query_driver = test_initialization()
+    init_time = time.time() - start_time
+    print(f"\n  ⏱  Initialization took {init_time:.2f} seconds")
+    
     if not success:
         print("\n✗ Failed to initialize. Exiting.")
         return
@@ -465,15 +470,26 @@ def main():
     ]
     
     results = []
+    test_times = []
+    total_start_time = time.time()
+    
     for test_name, test_func in tests:
         try:
+            test_start = time.time()
             result = test_func()
+            test_elapsed = time.time() - test_start
+            test_times.append((test_name, test_elapsed))
+            print(f"  ⏱  {test_name} took {test_elapsed:.2f} seconds")
             results.append((test_name, result))
         except Exception as e:
+            test_elapsed = time.time() - test_start if 'test_start' in locals() else 0
+            test_times.append((test_name, test_elapsed))
             print(f"\n✗ {test_name} test crashed: {str(e)}")
             import traceback
             traceback.print_exc()
             results.append((test_name, False))
+    
+    total_elapsed = time.time() - total_start_time
     
     # Summary
     print("\n" + "=" * 60)
@@ -485,9 +501,12 @@ def main():
     
     for test_name, result in results:
         status = "✓ PASS" if result else "✗ FAIL"
-        print(f"  {status}: {test_name}")
+        # Find corresponding time
+        test_time = next((t for name, t in test_times if name == test_name), 0)
+        print(f"  {status}: {test_name} ({test_time:.2f}s)")
     
     print(f"\n  Total: {passed}/{total} tests passed")
+    print(f"  Total time: {total_elapsed:.2f} seconds (including initialization: {total_elapsed + init_time:.2f}s)")
     
     if passed == total:
         print("\n✓ All tests passed!")
