@@ -205,7 +205,7 @@ class Indexer:
                 indexable_files.append(file_path)
         
         # Print count of indexable files
-        print(f"\nFound {len(indexable_files)} indexable file(s)")
+        print(f"\nFound {len(indexable_files)} supported file(s) that need to be indexed")
         
         if not indexable_files:
             print("No files to index.")

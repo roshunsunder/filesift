@@ -35,13 +35,41 @@ def index(path: Path):
             click.echo("Indexing cancelled.")
             return
     
-    # TODO: Implement indexing
-    # - Create Indexer instance
-    # - Load existing index if present
-    # - Run index() method
-    # - Save index to .filesift directory
-    click.echo(f"Indexing directory: {path}")
-    pass
+    try:
+        from filesift._core.indexer import Indexer
+    except ImportError:
+        print("Couldn't load indexer. Aborting...")
+        raise click.Abort()
+    
+    try:
+        # Create Indexer instance
+        indexer = Indexer(root=path)
+
+        existing_index = index_dir.exists() and any(index_dir.iterdir())
+        
+        # Load existing index if present
+        if existing_index:
+            try:
+                indexer.load(index_dir)
+                click.echo("Existing index found, will check for changes...")
+            except Exception as e:
+                click.echo(f"Warning: Could not load existing index: {e}", err=True)
+                click.echo("Starting fresh index.")
+        
+        # Run index() method
+        indexer.index()
+        
+        # Save index to .filesift directory
+        indexer.save(index_dir)
+
+        if existing_index:
+            click.echo("Index successfully updated.")
+        else:
+            click.echo(f"Index successfully created.")
+        
+    except Exception as e:
+        click.echo(f"Error during indexing: {e}", err=True)
+        raise click.Abort()
 
 
 @cli.group()
