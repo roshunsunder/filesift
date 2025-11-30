@@ -24,7 +24,8 @@ def find(query: str):
 
 @cli.command()
 @click.argument("path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def index(path: Path):
+@click.option("--reindex", is_flag=True, help="Force a complete reindex, overwriting any existing index")
+def index(path: Path, reindex: bool):
     """Index a directory for search"""
     index_dir = path / ".filesift"
     
@@ -40,14 +41,16 @@ def index(path: Path):
 
         existing_index = index_dir.exists() and any(index_dir.iterdir())
         
-        # Load existing index if present
-        if existing_index:
+        # Load existing index if present (unless reindex is requested)
+        if existing_index and not reindex:
             try:
                 indexer.load(index_dir)
                 click.echo("Existing index found, will check for changes...")
             except Exception as e:
                 click.echo(f"Warning: Could not load existing index: {e}", err=True)
                 click.echo("Starting fresh index.")
+        elif existing_index and reindex:
+            click.echo("Reindexing: creating fresh index (existing index will be overwritten)...")
         
         # Run index() method
         indexer.index()
@@ -55,7 +58,9 @@ def index(path: Path):
         # Save index to .filesift directory
         indexer.save(index_dir)
 
-        if existing_index:
+        if reindex:
+            click.echo("Index successfully reindexed.")
+        elif existing_index:
             click.echo("Index successfully updated.")
         else:
             click.echo(f"Index successfully created.")
