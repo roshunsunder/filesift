@@ -18,13 +18,13 @@ IMAGE_MODEL = "google/gemma-3-4b"
 # Code processing model (for LM Studio)
 CODE_MODEL = "google/gemma-3-1b"
 
-# LM Studio settings
-[lm_studio]
-# Base URL for LM Studio API
-BASE_URL = "http://localhost:1234/v1"
+# LLM settings
+[llm]
+# Base URL for OpenAI API
+LLM_BASE_URL = ""
 
-# API key for LM Studio (typically "lm-studio" for local instances)
-API_KEY = "lm-studio"
+# API key for LLM
+LLM_API_KEY = "placeholder_key"
 
 # API Keys
 [api_keys]
