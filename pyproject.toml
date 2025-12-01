@@ -30,3 +30,6 @@ filesift = "filesift.cli.command:main"
 
 [tool.setuptools.packages.find]
 include = ["filesift*"]
+
+[tool.setuptools.package-data]
+filesift = ["_config/default_config.toml"]

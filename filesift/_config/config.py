@@ -1,6 +1,7 @@
 from pathlib import Path
 from platformdirs import user_config_dir
 import tomllib
+from importlib import resources
 
 APP_NAME = "filesift"
 
@@ -14,8 +15,7 @@ def load_config():
 
     # If config file is missing, write default
     if not config_file.exists():
-        default_config_path = Path(__file__).parent / "default_config.toml"
-        default_config = default_config_path.read_text()
+        default_config = resources.files("filesift._config").joinpath("default_config.toml").read_text()
         config_file.write_text(default_config)
 
     return tomllib.loads(config_file.read_text())
