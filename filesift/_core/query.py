@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 
 from langchain_core.documents import Document
-from filesift._config.settings import settings
+from filesift._config.config import config_dict
 
 
 class SearchResult:
@@ -39,7 +39,7 @@ class QueryDriver:
         
         self.logger = logging.getLogger(__name__)
         self.embedding_model = HuggingFaceEmbeddings(
-            model_name="BAAI/bge-small-en-v1.5"
+            model_name=config_dict["models"]["EMBEDDING_MODEL"]
         )
         self.vector_store: Optional[FAISS] = None
         self.bm25_index: Optional[BM25Okapi] = None
@@ -54,8 +54,9 @@ class QueryDriver:
             print("Could not load FAISS, aborting.")
             return
         try:
+            index_dir_name = config_dict["paths"]["INDEX_DIR_NAME"]
             self.vector_store = FAISS.load_local(
-                str(path_obj / "faiss_index"),
+                str(path_obj / index_dir_name),
                 self.embedding_model,
                 allow_dangerous_deserialization=True,
             )
@@ -182,9 +183,11 @@ class QueryDriver:
 
         filters = filters or {}
 
+        max_results = config_dict["search"]["MAX_RESULTS"]
+        
         # Perform semantic search
         semantic_results = self.vector_store.similarity_search_with_score(
-            query, k=settings.MAX_RESULTS * 2  # Get more candidates for hybrid search
+            query, k=max_results * 2  # Get more candidates for hybrid search
         )
         
         # Perform BM25 search if available
@@ -192,7 +195,7 @@ class QueryDriver:
             tokenized_query = query.lower().split()
             bm25_scores = self.bm25_index.get_scores(tokenized_query)
             # Get top-k BM25 results
-            bm25_top_k = np.argsort(bm25_scores)[-settings.MAX_RESULTS * 2:][::-1]
+            bm25_top_k = np.argsort(bm25_scores)[-max_results * 2:][::-1]
             bm25_top_k = [int(idx) for idx in bm25_top_k if bm25_scores[idx] > 0]
         else:
             bm25_top_k = []
@@ -216,7 +219,7 @@ class QueryDriver:
             sorted_paths = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
             results = []
             
-            for path, rrf_score in sorted_paths[:settings.MAX_RESULTS]:
+            for path, rrf_score in sorted_paths[:max_results]:
                 if path in semantic_map:
                     doc, semantic_sim = semantic_map[path]
                     # Use RRF score as the final score
@@ -227,6 +230,7 @@ class QueryDriver:
                     ))
         else:
             # Semantic search only (fallback if BM25 not available)
+            similarity_threshold = config_dict["search"]["SIMILARITY_THRESHOLD"]
             results = [
                 SearchResult(
                     path=doc.metadata["path"],
@@ -234,8 +238,8 @@ class QueryDriver:
                     metadata=doc.metadata
                 )
                 for doc, score in semantic_results
-                if (1.0 - score) >= settings.SIMILARITY_THRESHOLD
-            ][:settings.MAX_RESULTS]
+                if (1.0 - score) >= similarity_threshold
+            ][:max_results]
         
         # Apply filters
         results = self._apply_filters(results, filters)

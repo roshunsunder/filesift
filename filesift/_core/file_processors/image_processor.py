@@ -4,17 +4,24 @@ import base64
 from openai import OpenAI
 
 from .base import BaseFileProcessor
+from filesift._config.config import config_dict
 
 class ImageProcessor(BaseFileProcessor):
     """Processor for handling image files using local LM Studio VLM via OpenAI API"""
     
     def __init__(self, model_name: Optional[str] = None):
         super().__init__()
-        self.model_name = model_name or "google/gemma-3-4b"
+        self.model_name = model_name or config_dict["models"]["IMAGE_MODEL"]
         # LM Studio supports JPEG, PNG, and WebP, but we'll keep broader support
         # for files that might be converted or handled elsewhere
         self.supported_extensions: Set[str] = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-        self.client = OpenAI(api_key="lm-studio", base_url="http://localhost:1234/v1")
+        # Initialize OpenAI client with config
+        llm_api_key = config_dict["llm"]["LLM_API_KEY"]
+        llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
+        if llm_base_url and len(llm_base_url) > 0:
+            self.client = OpenAI(api_key=llm_api_key, base_url=llm_base_url)
+        else:
+            self.client = OpenAI(api_key=llm_api_key)
         
     def _encode_image(self, image_path: Path) -> str:
         """Encode image to base64 string"""

@@ -14,7 +14,7 @@ from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 from tqdm import tqdm
 
-from filesift._config.settings import settings
+from filesift._config.config import config_dict
 
 from .file_processors.base import BaseFileProcessor
 from .file_processors.code_processor import CodeProcessor
@@ -54,13 +54,13 @@ class Indexer:
         
         # Initialize embedding function
         self.embedding_function = HuggingFaceEmbeddings(
-            model_name="BAAI/bge-small-en-v1.5"
+            model_name=config_dict["models"]["EMBEDDING_MODEL"]
         )
         
         # Initialize text splitter for chunking
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=settings.CHUNK_SIZE,
-            chunk_overlap=settings.CHUNK_OVERLAP,
+            chunk_size=config_dict["indexing"]["CHUNK_SIZE"],
+            chunk_overlap=config_dict["indexing"]["CHUNK_OVERLAP"],
             separators=["\n\n", "\n", ". ", " ", ""]
         )
         
@@ -140,7 +140,8 @@ class Indexer:
             
             # For images, descriptions are typically short - don't chunk
             # For code and other text files, chunk the content
-            if result.get("file_type") == "image" or len(content) <= settings.CHUNK_SIZE:
+            chunk_size = config_dict["indexing"]["CHUNK_SIZE"]
+            if result.get("file_type") == "image" or len(content) <= chunk_size:
                 # Single chunk for short content or images
                 chunks = [content]
             else:
@@ -193,10 +194,11 @@ class Indexer:
         
         # First pass: collect all indexable files
         indexable_files = []
+        excluded_dirs = config_dict["indexing"]["EXCLUDED_DIRS"]
         for file_path in self.root.rglob("*"):
             # Skip directories and excluded paths
             if file_path.is_dir() or any(excluded in str(file_path) 
-                                       for excluded in settings.EXCLUDED_DIRS):
+                                       for excluded in excluded_dirs):
                 continue
                 
             # Check if file needs indexing
@@ -308,7 +310,8 @@ class Indexer:
         
         # Save vector store
         if self.vector_store:
-            self.vector_store.save_local(str(directory / "faiss_index"))
+            index_dir_name = config_dict["paths"]["INDEX_DIR_NAME"]
+            self.vector_store.save_local(str(directory / index_dir_name))
         
         # Save BM25 index, documents, and file mapping
         if self.bm25_index and self.bm25_documents:
@@ -336,8 +339,9 @@ class Indexer:
             
         # Load vector store
         try:
+            index_dir_name = config_dict["paths"]["INDEX_DIR_NAME"]
             self.vector_store = FAISS.load_local(
-                str(directory / "faiss_index"),
+                str(directory / index_dir_name),
                 self.embedding_function,
                 allow_dangerous_deserialization=True
             )

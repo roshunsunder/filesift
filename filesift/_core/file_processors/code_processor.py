@@ -5,6 +5,7 @@ from langchain_community.document_loaders import TextLoader
 import tiktoken
 
 from .base import BaseFileProcessor
+from filesift._config.config import config_dict
 
 class CodeProcessor(BaseFileProcessor):
     """Processor for handling code files"""
@@ -16,7 +17,13 @@ class CodeProcessor(BaseFileProcessor):
             ".cs", ".rb", ".go", ".rs", ".ts", ".php", ".swift",
             ".html"
         }
-        self.client = OpenAI(api_key="lm-studio", base_url="http://localhost:1234/v1")
+        # Initialize OpenAI client with config
+        llm_api_key = config_dict["llm"]["LLM_API_KEY"]
+        llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
+        if llm_base_url and len(llm_base_url) > 0:
+            self.client = OpenAI(api_key=llm_api_key, base_url=llm_base_url)
+        else:
+            self.client = OpenAI(api_key=llm_api_key)
         # Reserve tokens for prompt and response (4096 - 3000 = 1096 for prompt + response)
         self.max_tokens_for_summary = max_tokens_for_summary
         # Use cl100k_base encoding (used by GPT models)
@@ -68,8 +75,9 @@ class CodeProcessor(BaseFileProcessor):
             messages = [{"role": "user", "content": prompt}]
             
             try:
+                code_model = config_dict["models"]["CODE_MODEL"]
                 response = self.client.chat.completions.create(
-                    model="google/gemma-3-1b",
+                    model=code_model,
                     messages=messages,
                     temperature=0
                 )
