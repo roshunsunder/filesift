@@ -69,9 +69,15 @@ class CodeProcessor(BaseFileProcessor):
             
             # Truncate code for LLM summarization to avoid context length issues
             code_for_summary = self._truncate_code_for_summary(code)
+
+            file_info = self.extract_file_info(file_path)
             
             # Get code summary from GPT
-            prompt = f"Summarize the purpose of the following code:\n```\n{code_for_summary}\n```"
+            prompt = (
+                f"Here is some information about a code file:\n{file_info}\n"
+                "Based on this and the following preview, describe the purpose of the code:\n"
+                f"```\n{code_for_summary}\n```"
+            )
             messages = [{"role": "user", "content": prompt}]
             
             try:
@@ -82,6 +88,7 @@ class CodeProcessor(BaseFileProcessor):
                     temperature=0
                 )
                 summary = response.choices[0].message.content
+                print(summary)
             except Exception as e:
                 # If LLM call fails, use a fallback summary
                 self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
