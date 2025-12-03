@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import logging
+import time
 from datetime import datetime
 import pickle
 import numpy as np
@@ -47,6 +48,8 @@ class QueryDriver:
 
     def load_from_disk(self, path: str):
         """Load the vector store and BM25 index from disk"""
+        load_start = time.time()
+        print(f"[QueryDriver] Starting load_from_disk: {path}")
         path_obj = Path(path)
         try:
             from langchain_community.vectorstores.faiss import FAISS
@@ -55,21 +58,33 @@ class QueryDriver:
             return
         try:
             index_dir_name = config_dict["paths"]["INDEX_DIR_NAME"]
+            faiss_start = time.time()
+            print(f"[QueryDriver] Loading FAISS index from {path_obj / index_dir_name}...")
             self.vector_store = FAISS.load_local(
                 str(path_obj / index_dir_name),
                 self.embedding_model,
                 allow_dangerous_deserialization=True,
             )
+            faiss_time = time.time() - faiss_start
+            print(f"[QueryDriver] FAISS index loaded in {faiss_time:.2f}s")
         except Exception as e:
             self.logger.error(f"Error loading vector store: {str(e)}")
             raise
 
         # Load BM25 index and documents
         try:
+            bm25_start = time.time()
+            print(f"[QueryDriver] Loading BM25 index and documents...")
             with open(path_obj / "bm25_index.pkl", "rb") as f:
                 self.bm25_index = pickle.load(f)
+            bm25_index_time = time.time() - bm25_start
+            print(f"[QueryDriver] BM25 index loaded in {bm25_index_time:.2f}s")
+            
+            docs_start = time.time()
             with open(path_obj / "bm25_documents.pkl", "rb") as f:
                 self.bm25_documents = pickle.load(f)
+            docs_time = time.time() - docs_start
+            print(f"[QueryDriver] BM25 documents loaded in {docs_time:.2f}s")
         except FileNotFoundError:
             self.logger.warning("No BM25 index found, will use semantic search only")
             self.bm25_index = None
@@ -78,6 +93,9 @@ class QueryDriver:
             self.logger.warning(f"Could not load BM25 index: {str(e)}")
             self.bm25_index = None
             self.bm25_documents = []
+        
+        total_time = time.time() - load_start
+        print(f"[QueryDriver] load_from_disk() completed in {total_time:.2f}s")
         
     def _apply_filters(
         self, results: List[SearchResult], filters: Dict[str, Any]

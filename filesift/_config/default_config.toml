@@ -66,3 +66,15 @@ EXCLUDED_DIRS = [
     ".filesift"
 ]
 
+# Daemon settings
+[daemon]
+# Host to bind daemon server to
+HOST = "127.0.0.1"
+
+# Port for daemon server
+PORT = 8687
+
+# Inactivity timeout in seconds (daemon will auto-terminate after this period)
+# Set to 0 to disable auto-shutdown
+INACTIVITY_TIMEOUT = 300  # 5 minutes default
+

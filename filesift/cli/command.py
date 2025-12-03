@@ -1,4 +1,5 @@
 import click
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +32,87 @@ def find(query: str, path: Optional[Path]):
         click.echo(f"  filesift index {search_dir}", err=True)
         raise click.Abort()
     
+    # Try daemon first
+    find_start = time.time()
+    from filesift.cli.daemon_utils import is_daemon_running, get_daemon_url, ensure_daemon_running
+    import requests
+    from filesift._core.query import SearchResult
+    
+    print(f"[CLI] Starting find command at {time.strftime('%H:%M:%S')}")
+    
+    # Ensure daemon is running (will start if not)
+    ensure_start = time.time()
+    ensure_daemon_running()
+    ensure_time = time.time() - ensure_start
+    print(f"[CLI] ensure_daemon_running() took {ensure_time:.2f}s")
+    
+    if is_daemon_running():
+        # Use daemon (this resets inactivity timer)
+        print(f"[CLI] Using daemon for search")
+        try:
+            url = get_daemon_url()
+            request_start = time.time()
+            print(f"[CLI] Sending search request to daemon...")
+            response = requests.post(
+                f"{url}/search",
+                json={
+                    "index_path": str(index_dir),
+                    "query": query,
+                    "filters": {}
+                },
+                timeout=30
+            )
+            request_time = time.time() - request_start
+            print(f"[CLI] HTTP request/response took {request_time:.2f}s")
+            
+            response.raise_for_status()
+            parse_start = time.time()
+            data = response.json()
+            parse_time = time.time() - parse_start
+            print(f"[CLI] JSON parsing took {parse_time:.3f}s")
+            
+            # Convert dict results back to SearchResult objects
+            convert_start = time.time()
+            results = [
+                SearchResult(
+                    path=r["path"],
+                    score=r["score"],
+                    metadata=r["metadata"]
+                )
+                for r in data["results"]
+            ]
+            convert_time = time.time() - convert_start
+            print(f"[CLI] Result conversion took {convert_time:.3f}s")
+            
+            total_time = time.time() - find_start
+            print(f"[CLI] Total find command (daemon path) took {total_time:.2f}s")
+            
+            # Display results
+            if not results:
+                click.echo("No results found.")
+                return
+            
+            click.echo(f"\nFound {len(results)} result(s):\n")
+            for i, result in enumerate(results, 1):
+                # Format the result nicely
+                click.echo(f"{i}. {result.path}")
+                
+                # Show relevant metadata if available
+                metadata_parts = []
+                if result.metadata.get("file_type"):
+                    metadata_parts.append(f"Type: {result.metadata['file_type']}")
+                
+                if metadata_parts:
+                    click.echo(f"   {' | '.join(metadata_parts)}")
+                click.echo()
+            return
+        except Exception as e:
+            click.echo(f"Error communicating with daemon: {e}", err=True)
+            click.echo("Falling back to local QueryDriver...", err=True)
+            print(f"[CLI] Daemon error: {e}, falling back to local QueryDriver")
+    
+    # Fallback to local QueryDriver
+    print(f"[CLI] Using local QueryDriver (fallback path)")
     try:
         from filesift._core.query import QueryDriver
     except ImportError:
@@ -39,13 +121,22 @@ def find(query: str, path: Optional[Path]):
     
     try:
         # Load the index
-        print("Loading index...")
+        print("[CLI] Loading index from disk (local QueryDriver)...")
+        load_start = time.time()
         query_driver = QueryDriver()
         query_driver.load_from_disk(str(index_dir))
+        load_time = time.time() - load_start
+        print(f"[CLI] Index loaded from disk in {load_time:.2f}s")
         
         # Perform hybrid search
         click.echo(f"Searching for: {query}")
+        search_start = time.time()
         results = query_driver.search(query)
+        search_time = time.time() - search_start
+        print(f"[CLI] Search execution took {search_time:.2f}s")
+        
+        total_time = time.time() - find_start
+        print(f"[CLI] Total find command (local path) took {total_time:.2f}s")
         
         # Display results
         if not results:
@@ -113,6 +204,25 @@ def index(path: Path, reindex: bool):
             click.echo("Index successfully updated.")
         else:
             click.echo(f"Index successfully created.")
+        
+        # Ensure daemon is running and reload index (resets timer)
+        from filesift.cli.daemon_utils import ensure_daemon_running, get_daemon_url
+        import requests
+        
+        if ensure_daemon_running():
+            try:
+                url = get_daemon_url()
+                # Reload index in daemon (this resets inactivity timer)
+                requests.post(
+                    f"{url}/reload",
+                    json={"index_path": str(index_dir)},
+                    timeout=5
+                )
+                click.echo("Index reloaded in daemon.")
+            except Exception as e:
+                click.echo(f"Warning: Could not reload index in daemon: {e}", err=True)
+        else:
+            click.echo("Warning: Could not start daemon.", err=True)
         
     except Exception as e:
         click.echo(f"Error during indexing: {e}", err=True)
@@ -191,6 +301,213 @@ def path():
     click.echo("Configuration file path:")
     # TODO: Display path
     pass
+
+
+@cli.group()
+def daemon():
+    """Manage the filesift daemon"""
+    pass
+
+
+@daemon.command()
+def start():
+    """Start the filesift daemon"""
+    from filesift.cli.daemon_utils import is_daemon_running, start_daemon_process, get_daemon_pid, get_daemon_url
+    
+    if is_daemon_running():
+        pid = get_daemon_pid()
+        url = get_daemon_url()
+        click.echo(f"Daemon is already running (PID: {pid}, URL: {url})")
+        return
+    
+    if start_daemon_process():
+        import time
+        time.sleep(0.5)  # Give it a moment to start
+        if is_daemon_running():
+            pid = get_daemon_pid()
+            url = get_daemon_url()
+            click.echo(f"Daemon started successfully (PID: {pid}, URL: {url})")
+        else:
+            click.echo("Daemon process started but not responding. Check logs.")
+    else:
+        click.echo("Failed to start daemon.", err=True)
+
+
+@daemon.command()
+def stop():
+    """Stop the filesift daemon"""
+    from filesift.cli.daemon_utils import is_daemon_running, get_daemon_pid, DAEMON_PID_FILE
+    import os
+    import signal
+    
+    if not is_daemon_running():
+        click.echo("Daemon is not running.")
+        # Clean up stale PID file
+        if DAEMON_PID_FILE.exists():
+            DAEMON_PID_FILE.unlink()
+        return
+    
+    pid = get_daemon_pid()
+    if pid:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            click.echo(f"Sent termination signal to daemon (PID: {pid})")
+            # Wait a moment and check
+            import time
+            time.sleep(0.5)
+            if not is_daemon_running():
+                DAEMON_PID_FILE.unlink()
+                click.echo("Daemon stopped successfully.")
+            else:
+                click.echo("Daemon did not stop, trying SIGKILL...")
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    DAEMON_PID_FILE.unlink()
+                    click.echo("Daemon force-killed.")
+                except ProcessLookupError:
+                    click.echo("Daemon already stopped.")
+        except ProcessLookupError:
+            click.echo(f"Daemon process (PID: {pid}) not found. Cleaning up PID file.")
+            DAEMON_PID_FILE.unlink()
+        except PermissionError:
+            click.echo(f"Permission denied. Try: kill {pid}", err=True)
+    else:
+        click.echo("Could not find daemon PID.")
+
+
+@daemon.command()
+def status():
+    """Check daemon status"""
+    from filesift.cli.daemon_utils import is_daemon_running, get_daemon_url, get_daemon_pid
+    from filesift._config.config import config_dict
+    
+    if is_daemon_running():
+        url = get_daemon_url()
+        pid = get_daemon_pid()
+        daemon_config = config_dict.get("daemon", {})
+        timeout = daemon_config.get("INACTIVITY_TIMEOUT", 300)
+        click.echo(f"Daemon is running")
+        click.echo(f"  PID: {pid}")
+        click.echo(f"  URL: {url}")
+        if timeout > 0:
+            click.echo(f"  Auto-shutdown: after {timeout}s of inactivity")
+        else:
+            click.echo(f"  Auto-shutdown: disabled")
+    else:
+        click.echo("Daemon is not running.")
+
+
+@daemon.command("list")
+def list_daemons():
+    """List all running filesift daemon processes"""
+    import subprocess
+    import sys
+    
+    click.echo("Searching for filesift daemon processes...")
+    try:
+        # Use ps to find daemon processes
+        if sys.platform == "darwin":  # macOS
+            result = subprocess.run(
+                ["ps", "aux"],
+                capture_output=True,
+                text=True
+            )
+        else:  # Linux
+            result = subprocess.run(
+                ["ps", "aux"],
+                capture_output=True,
+                text=True
+            )
+        
+        lines = result.stdout.split('\n')
+        daemon_processes = []
+        for line in lines:
+            if 'daemon_main.py' in line or ('filesift' in line and 'daemon' in line.lower()):
+                daemon_processes.append(line)
+        
+        if daemon_processes:
+            click.echo("\nFound daemon processes:")
+            for proc in daemon_processes:
+                click.echo(f"  {proc}")
+        else:
+            click.echo("No daemon processes found.")
+    except Exception as e:
+        click.echo(f"Error listing processes: {e}", err=True)
+        click.echo("\nManual command:")
+        click.echo("  ps aux | grep daemon_main.py")
+        click.echo("  or")
+        click.echo("  ps aux | grep filesift")
+
+
+@daemon.command("kill")
+@click.option("--pid", type=int, help="Kill daemon by PID")
+@click.option("--all", is_flag=True, help="Kill all filesift daemon processes")
+def kill_daemon(pid: Optional[int], all: bool):
+    """Kill daemon process(es)"""
+    import os
+    import signal
+    import subprocess
+    import sys
+    from filesift.cli.daemon_utils import get_daemon_pid, DAEMON_PID_FILE
+    
+    if all:
+        # Kill all daemon processes
+        click.echo("Killing all filesift daemon processes...")
+        try:
+            if sys.platform == "darwin":  # macOS
+                subprocess.run(["pkill", "-f", "daemon_main.py"], check=False)
+            else:  # Linux
+                subprocess.run(["pkill", "-f", "daemon_main.py"], check=False)
+            click.echo("Killed all daemon processes.")
+            if DAEMON_PID_FILE.exists():
+                DAEMON_PID_FILE.unlink()
+        except Exception as e:
+            click.echo(f"Error killing processes: {e}", err=True)
+    elif pid:
+        # Kill specific PID
+        try:
+            os.kill(pid, signal.SIGTERM)
+            click.echo(f"Sent termination signal to PID {pid}")
+            import time
+            time.sleep(0.5)
+            try:
+                os.kill(pid, 0)  # Check if still exists
+                os.kill(pid, signal.SIGKILL)
+                click.echo(f"Force-killed PID {pid}")
+            except ProcessLookupError:
+                click.echo(f"Process {pid} terminated.")
+        except ProcessLookupError:
+            click.echo(f"Process {pid} not found.")
+        except PermissionError:
+            click.echo(f"Permission denied. Try: kill {pid}", err=True)
+    else:
+        # Kill the registered daemon
+        from filesift.cli.daemon_utils import is_daemon_running
+        if not is_daemon_running():
+            click.echo("Daemon is not running.")
+            return
+        
+        registered_pid = get_daemon_pid()
+        if registered_pid:
+            try:
+                os.kill(registered_pid, signal.SIGTERM)
+                click.echo(f"Sent termination signal to daemon (PID: {registered_pid})")
+                import time
+                time.sleep(0.5)
+                if not is_daemon_running():
+                    DAEMON_PID_FILE.unlink()
+                    click.echo("Daemon stopped.")
+                else:
+                    os.kill(registered_pid, signal.SIGKILL)
+                    DAEMON_PID_FILE.unlink()
+                    click.echo("Daemon force-killed.")
+            except ProcessLookupError:
+                click.echo("Daemon process not found. Cleaning up PID file.")
+                DAEMON_PID_FILE.unlink()
+            except PermissionError:
+                click.echo(f"Permission denied. Try: kill {registered_pid}", err=True)
+        else:
+            click.echo("No registered daemon PID found.")
 
 
 def main():
