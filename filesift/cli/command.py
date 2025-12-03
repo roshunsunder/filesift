@@ -185,7 +185,6 @@ def index(path: Path, reindex: bool):
                     json={"index_path": str(index_dir)},
                     timeout=5
                 )
-                click.echo("Index reloaded in daemon.")
             except Exception as e:
                 click.echo(f"Warning: Could not reload index in daemon: {e}", err=True)
         else:

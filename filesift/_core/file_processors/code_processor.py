@@ -75,7 +75,10 @@ class CodeProcessor(BaseFileProcessor):
             # Get code summary from GPT
             prompt = (
                 f"Here is some information about a code file:\n{file_info}\n"
-                "Based on this and the following preview, describe the purpose of the code:\n"
+                "Analyze this code and provide a concise, technical summary for a search index. "
+                "Focus on the main purpose, key classes/functions, and architectural role. "
+                "Do not include the source code or conversational filler. "
+                "Start directly with the description.\n"
                 f"```\n{code_for_summary}\n```"
             )
             messages = [{"role": "user", "content": prompt}]

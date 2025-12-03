@@ -136,17 +136,18 @@ class Indexer:
                 return []
                 
             result = processor.process(file_path)
-            content = result["content"]
+            summary = result["summary"]
+            print(summary)
             
             # For images, descriptions are typically short - don't chunk
             # For code and other text files, chunk the content
             chunk_size = config_dict["indexing"]["CHUNK_SIZE"]
-            if result.get("file_type") == "image" or len(content) <= chunk_size:
+            if result.get("file_type") == "image" or len(summary) <= chunk_size:
                 # Single chunk for short content or images
-                chunks = [content]
+                chunks = [summary]
             else:
                 # Split into chunks
-                chunks = self.text_splitter.split_text(content)
+                chunks = self.text_splitter.split_text(summary)
             
             # Enrich metadata with additional searchable fields
             file_path_str = str(file_path)
@@ -163,7 +164,7 @@ class Indexer:
             }
             
             # Extract year and keywords
-            year = self._extract_year(file_path, content)
+            year = self._extract_year(file_path, summary)
             if year:
                 enriched_metadata["year"] = year
             
