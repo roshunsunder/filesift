@@ -74,7 +74,7 @@ class ImageProcessor(BaseFileProcessor):
             description = response.output_text
             
             return {
-                "content": description,
+                "summary": description,
                 "file_type": "image",
                 "image_type": file_path.suffix.lower()[1:],  # Remove the dot
                 "metadata": {

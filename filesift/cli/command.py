@@ -1,3 +1,7 @@
+import os
+# Set TOKENIZERS_PARALLELISM before any tokenizers are loaded to avoid fork warnings
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import click
 from pathlib import Path
 from typing import Optional

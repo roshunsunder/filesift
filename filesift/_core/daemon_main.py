@@ -1,6 +1,10 @@
 """
 Main entry point for running the daemon as a standalone process
 """
+import os
+# Set TOKENIZERS_PARALLELISM before any tokenizers are loaded to avoid fork warnings
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import sys
 from filesift._core.daemon import DaemonServer
 
