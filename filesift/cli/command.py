@@ -1,5 +1,4 @@
 import click
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -33,26 +32,17 @@ def find(query: str, path: Optional[Path]):
         raise click.Abort()
     
     # Try daemon first
-    find_start = time.time()
     from filesift.cli.daemon_utils import is_daemon_running, get_daemon_url, ensure_daemon_running
     import requests
     from filesift._core.query import SearchResult
     
-    print(f"[CLI] Starting find command at {time.strftime('%H:%M:%S')}")
-    
     # Ensure daemon is running (will start if not)
-    ensure_start = time.time()
     ensure_daemon_running()
-    ensure_time = time.time() - ensure_start
-    print(f"[CLI] ensure_daemon_running() took {ensure_time:.2f}s")
     
     if is_daemon_running():
         # Use daemon (this resets inactivity timer)
-        print(f"[CLI] Using daemon for search")
         try:
             url = get_daemon_url()
-            request_start = time.time()
-            print(f"[CLI] Sending search request to daemon...")
             response = requests.post(
                 f"{url}/search",
                 json={
@@ -62,17 +52,10 @@ def find(query: str, path: Optional[Path]):
                 },
                 timeout=30
             )
-            request_time = time.time() - request_start
-            print(f"[CLI] HTTP request/response took {request_time:.2f}s")
-            
             response.raise_for_status()
-            parse_start = time.time()
             data = response.json()
-            parse_time = time.time() - parse_start
-            print(f"[CLI] JSON parsing took {parse_time:.3f}s")
             
             # Convert dict results back to SearchResult objects
-            convert_start = time.time()
             results = [
                 SearchResult(
                     path=r["path"],
@@ -81,11 +64,6 @@ def find(query: str, path: Optional[Path]):
                 )
                 for r in data["results"]
             ]
-            convert_time = time.time() - convert_start
-            print(f"[CLI] Result conversion took {convert_time:.3f}s")
-            
-            total_time = time.time() - find_start
-            print(f"[CLI] Total find command (daemon path) took {total_time:.2f}s")
             
             # Display results
             if not results:
@@ -109,10 +87,8 @@ def find(query: str, path: Optional[Path]):
         except Exception as e:
             click.echo(f"Error communicating with daemon: {e}", err=True)
             click.echo("Falling back to local QueryDriver...", err=True)
-            print(f"[CLI] Daemon error: {e}, falling back to local QueryDriver")
     
     # Fallback to local QueryDriver
-    print(f"[CLI] Using local QueryDriver (fallback path)")
     try:
         from filesift._core.query import QueryDriver
     except ImportError:
@@ -121,22 +97,13 @@ def find(query: str, path: Optional[Path]):
     
     try:
         # Load the index
-        print("[CLI] Loading index from disk (local QueryDriver)...")
-        load_start = time.time()
+        print("Loading index...")
         query_driver = QueryDriver()
         query_driver.load_from_disk(str(index_dir))
-        load_time = time.time() - load_start
-        print(f"[CLI] Index loaded from disk in {load_time:.2f}s")
         
         # Perform hybrid search
         click.echo(f"Searching for: {query}")
-        search_start = time.time()
         results = query_driver.search(query)
-        search_time = time.time() - search_start
-        print(f"[CLI] Search execution took {search_time:.2f}s")
-        
-        total_time = time.time() - find_start
-        print(f"[CLI] Total find command (local path) took {total_time:.2f}s")
         
         # Display results
         if not results:
@@ -402,28 +369,33 @@ def list_daemons():
     """List all running filesift daemon processes"""
     import subprocess
     import sys
+    import os
     
+    current_pid = os.getpid()
     click.echo("Searching for filesift daemon processes...")
     try:
         # Use ps to find daemon processes
-        if sys.platform == "darwin":  # macOS
-            result = subprocess.run(
-                ["ps", "aux"],
-                capture_output=True,
-                text=True
-            )
-        else:  # Linux
-            result = subprocess.run(
-                ["ps", "aux"],
-                capture_output=True,
-                text=True
-            )
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True
+        )
         
         lines = result.stdout.split('\n')
         daemon_processes = []
         for line in lines:
-            if 'daemon_main.py' in line or ('filesift' in line and 'daemon' in line.lower()):
-                daemon_processes.append(line)
+            if 'daemon_main.py' in line:
+                # Extract PID from ps output (second column)
+                parts = line.split()
+                if len(parts) > 1:
+                    try:
+                        pid = int(parts[1])
+                        # Exclude current process
+                        if pid != current_pid:
+                            daemon_processes.append(line)
+                    except (ValueError, IndexError):
+                        # If we can't parse PID, include it anyway (shouldn't happen)
+                        daemon_processes.append(line)
         
         if daemon_processes:
             click.echo("\nFound daemon processes:")
