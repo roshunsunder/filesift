@@ -206,13 +206,190 @@ def config():
 @click.argument("key", required=True)
 @click.argument("value", required=True)
 def set(key: str, value: str):
-    """Set a configuration value"""
-    # TODO: Implement config set
-    # - Validate key exists in settings
-    # - Parse and validate value type
-    # - Update settings (may need to persist to file)
-    click.echo(f"Setting {key} = {value}")
-    pass
+    """Set a configuration value
+    
+    KEY format: section.KEY (e.g., search.MAX_RESULTS, daemon.PORT)
+    """
+    from filesift._config.config import load_config, save_config, get_default_config
+    
+    # Parse key format: section.KEY
+    if "." not in key:
+        click.echo(f"Error: Key must be in format 'section.KEY' (e.g., 'search.MAX_RESULTS')", err=True)
+        raise click.Abort()
+    
+    section_name, config_key = key.split(".", 1)
+    
+    # Load default config to validate key exists
+    default_config = get_default_config()
+    
+    # Validate section exists
+    if section_name not in default_config:
+        click.echo(f"Error: Section '{section_name}' not found in configuration", err=True)
+        click.echo(f"Available sections: {', '.join(default_config.keys())}", err=True)
+        raise click.Abort()
+    
+    # Validate key exists in section
+    if config_key not in default_config[section_name]:
+        click.echo(f"Error: Key '{config_key}' not found in section '{section_name}'", err=True)
+        click.echo(f"Available keys in '{section_name}': {', '.join(default_config[section_name].keys())}", err=True)
+        raise click.Abort()
+    
+    # Get the expected type from default config
+    expected_value = default_config[section_name][config_key]
+    expected_type = type(expected_value)
+    
+    # Parse value to appropriate type
+    try:
+        if expected_type == bool:
+            # Handle boolean values
+            if value.lower() in ("true", "1", "yes", "on"):
+                parsed_value = True
+            elif value.lower() in ("false", "0", "no", "off"):
+                parsed_value = False
+            else:
+                click.echo(f"Error: Invalid boolean value '{value}'. Use 'true' or 'false'", err=True)
+                raise click.Abort()
+        elif expected_type == int:
+            parsed_value = int(value)
+        elif expected_type == float:
+            parsed_value = float(value)
+        elif expected_type == list:
+            # Parse array: comma-separated or space-separated
+            # Remove brackets if present
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                value = value[1:-1].strip()
+            # Handle empty array
+            if not value:
+                parsed_value = []
+            # Split by comma or space
+            elif "," in value:
+                parsed_value = [item.strip().strip('"').strip("'") for item in value.split(",") if item.strip()]
+            else:
+                parsed_value = [item.strip().strip('"').strip("'") for item in value.split() if item.strip()]
+        else:
+            # String type (or unknown, treat as string)
+            parsed_value = value
+    except ValueError as e:
+        click.echo(f"Error: Could not parse value '{value}' as {expected_type.__name__}: {e}", err=True)
+        raise click.Abort()
+    
+    # Load current config
+    current_config = load_config()
+    
+    # Ensure section exists in current config
+    if section_name not in current_config:
+        current_config[section_name] = {}
+    
+    # Update the value
+    old_value = current_config[section_name].get(config_key, "not set")
+    current_config[section_name][config_key] = parsed_value
+    
+    # Save config
+    try:
+        save_config(current_config)
+        click.echo(f"Set {key} = {parsed_value} (was: {old_value})")
+        
+        # Reload the global config_dict
+        import filesift._config.config as config_module
+        config_module.config_dict = load_config()
+        click.echo("Configuration updated. Changes will take effect in new processes.")
+    except Exception as e:
+        click.echo(f"Error saving configuration: {e}", err=True)
+        raise click.Abort()
+
+
+@config.command("list")
+@click.argument("section", required=False)
+@click.option("--all", "show_all", is_flag=True, help="Show all sections with their keys and values")
+def list_config(section: Optional[str], show_all: bool):
+    """List configuration sections and their keys/values
+    
+    Without arguments, lists all available sections.
+    With a section name, shows keys and values for that section.
+    Use --all to show all sections with their keys and values.
+    """
+    from filesift._config.config import load_config, get_default_config
+    
+    # Load both current and default configs
+    current_config = load_config()
+    default_config = get_default_config()
+    
+    def format_value(value):
+        """Format a value for display"""
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        elif isinstance(value, list):
+            if not value:
+                return "[]"
+            # Show first few items, truncate if long
+            items = [str(item) for item in value[:3]]
+            if len(value) > 3:
+                items.append(f"... ({len(value)} total)")
+            return "[" + ", ".join(items) + "]"
+        elif isinstance(value, str) and len(value) > 50:
+            return value[:47] + "..."
+        else:
+            return str(value)
+    
+    if show_all:
+        # Show all sections with keys and values
+        for section_name in sorted(default_config.keys()):
+            click.echo(f"\n[{section_name}]")
+            if section_name in current_config:
+                section_config = current_config[section_name]
+            else:
+                section_config = default_config[section_name]
+            
+            for key in sorted(default_config[section_name].keys()):
+                if key in section_config:
+                    value = section_config[key]
+                    default_value = default_config[section_name][key]
+                    # Show if value differs from default
+                    if value != default_value:
+                        click.echo(f"  {key} = {format_value(value)} (default: {format_value(default_value)})")
+                    else:
+                        click.echo(f"  {key} = {format_value(value)}")
+                else:
+                    # Use default value
+                    default_value = default_config[section_name][key]
+                    click.echo(f"  {key} = {format_value(default_value)} (default)")
+        click.echo()
+    elif section:
+        # Show keys and values for a specific section
+        if section not in default_config:
+            click.echo(f"Error: Section '{section}' not found in configuration", err=True)
+            click.echo(f"Available sections: {', '.join(sorted(default_config.keys()))}", err=True)
+            raise click.Abort()
+        
+        click.echo(f"[{section}]")
+        if section in current_config:
+            section_config = current_config[section]
+        else:
+            section_config = default_config[section]
+        
+        for key in sorted(default_config[section].keys()):
+            if key in section_config:
+                value = section_config[key]
+                default_value = default_config[section][key]
+                # Show if value differs from default
+                if value != default_value:
+                    click.echo(f"  {key} = {format_value(value)} (default: {format_value(default_value)})")
+                else:
+                    click.echo(f"  {key} = {format_value(value)}")
+            else:
+                # Use default value
+                default_value = default_config[section][key]
+                click.echo(f"  {key} = {format_value(default_value)} (default)")
+    else:
+        # Just list all sections
+        click.echo("Available configuration sections:")
+        for section_name in sorted(default_config.keys()):
+            # Count keys in section
+            key_count = len(default_config[section_name])
+            click.echo(f"  {section_name} ({key_count} key{'s' if key_count != 1 else ''})")
+        click.echo("\nUse 'filesift config list <section>' to see keys and values for a section.")
+        click.echo("Use 'filesift config list --all' to see all sections with their keys and values.")
 
 
 @config.command("add-ignore")
