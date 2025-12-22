@@ -57,106 +57,92 @@ pip install filesift
 
 FileSift uses a TOML configuration file that is automatically created on first run. The configuration file is located at:
 
-- **macOS/Linux**: `~/.config/filesift/config.toml`
+- **macOS**: `~/Library/Application Support/filesift/config.toml`
+- **Linux**: `~/.config/filesift/config.toml`
 - **Windows**: `%APPDATA%\filesift\config.toml`
 
-### Setting Up Your Configuration
+### Managing Configuration
 
-#### 1. LLM Provider Setup
+**We recommend using the CLI commands to manage your configuration** rather than editing the config file directly. The CLI provides type validation and ensures your settings are properly formatted.
 
-FileSift works with any LLM inference provider that supports the OpenAI API format. Configure your provider in the config file:
+#### Viewing Configuration
 
-**For OpenAI:**
-```toml
-[llm]
-LLM_BASE_URL = ""  # Leave empty for OpenAI
-LLM_API_KEY = "sk-your-openai-api-key"
+```bash
+# List all available configuration sections
+filesift config list
+
+# View all configuration with values
+filesift config list --all
+
+# View a specific section (e.g., llm, search, daemon)
+filesift config list llm
+filesift config list search
+filesift config list daemon
 ```
 
-**For LM Studio (local):**
-```toml
-[llm]
-LLM_BASE_URL = "http://localhost:1234/v1"
-LLM_API_KEY = "lm-studio"  # Can be any placeholder
+#### Setting Configuration Values
+
+Use the `config set` command with the format `section.KEY`:
+
+```bash
+# LLM Provider Setup
+# For OpenAI (leave base URL empty)
+filesift config set llm.LLM_BASE_URL ""
+filesift config set llm.LLM_API_KEY "sk-your-openai-api-key"
+
+# For LM Studio (local)
+filesift config set llm.LLM_BASE_URL "http://localhost:1234/v1"
+filesift config set llm.LLM_API_KEY "lm-studio"
+
+# For Ollama
+filesift config set llm.LLM_BASE_URL "http://localhost:11434/v1"
+filesift config set llm.LLM_API_KEY "ollama"
+
+# Model Configuration
+filesift config set models.EMBEDDING_MODEL "BAAI/bge-small-en-v1.5"
+filesift config set models.IMAGE_MODEL "google/gemma-3-4b"
+filesift config set models.CODE_MODEL "google/gemma-3-1b"
+
+# Search Settings
+filesift config set search.MAX_RESULTS 10
+filesift config set search.SIMILARITY_THRESHOLD 0.7
+
+# Indexing Settings
+filesift config set indexing.CHUNK_SIZE 1000
+filesift config set indexing.CHUNK_OVERLAP 200
+
+# Daemon Settings
+filesift config set daemon.HOST "127.0.0.1"
+filesift config set daemon.PORT 8687
+filesift config set daemon.INACTIVITY_TIMEOUT 300
+
+# Boolean values
+filesift config set daemon.ENABLE_FEATURE true
+
+# Array values (comma-separated or space-separated)
+filesift config set indexing.EXCLUDED_DIRS ".git,node_modules,__pycache__"
 ```
 
-**For Ollama:**
-```toml
-[llm]
-LLM_BASE_URL = "http://localhost:11434/v1"
-LLM_API_KEY = "ollama"  # Can be any placeholder
-```
+The CLI automatically handles type conversion (strings, integers, floats, booleans, arrays) and validates that the configuration keys exist.
 
-**For other providers:**
-Set `LLM_BASE_URL` to your provider's API endpoint and `LLM_API_KEY` to your API key (if required).
+#### Configuration Sections
 
-#### 2. Model Configuration
-
-You can customize which models are used for different tasks:
-
-```toml
-[models]
-# Embedding model for semantic search (Hugging Face model)
-EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
-
-# Image processing model (for vision-language tasks)
-IMAGE_MODEL = "google/gemma-3-4b"
-
-# Code processing model (for code understanding)
-CODE_MODEL = "google/gemma-3-1b"
-```
-
-#### 3. Search Settings
-
-```toml
-[search]
-# Maximum number of results to return
-MAX_RESULTS = 10
-
-# Similarity threshold (0.0 to 1.0) - only return results above this threshold
-SIMILARITY_THRESHOLD = 0.7
-```
-
-#### 4. Indexing Settings
-
-```toml
-[indexing]
-# Chunk size for splitting large files
-CHUNK_SIZE = 1000
-
-# Overlap between chunks (helps maintain context)
-CHUNK_OVERLAP = 200
-
-# Directories to exclude from indexing
-EXCLUDED_DIRS = [
-    ".git",
-    "node_modules",
-    "__pycache__",
-    "venv",
-    "env",
-    ".env",
-    "build",
-    "dist",
-    ".filesift"
-]
-```
-
-#### 5. Daemon Settings
-
-```toml
-[daemon]
-# Host and port for the daemon server
-HOST = "127.0.0.1"
-PORT = 8687
-
-# Auto-shutdown after inactivity (in seconds)
-# Set to 0 to disable auto-shutdown
-INACTIVITY_TIMEOUT = 300  # 5 minutes
-```
+Available configuration sections:
+- `llm` - LLM provider settings (base URL, API key)
+- `models` - Model selection (embedding, image, code models)
+- `search` - Search behavior (max results, similarity threshold)
+- `indexing` - Indexing settings (chunk size, overlap, excluded directories)
+- `daemon` - Daemon server settings (host, port, inactivity timeout)
+- `api_keys` - API keys for external services
+- `paths` - Path-related settings
 
 ### Environment Variables
 
 You can override configuration values using environment variables. The config system will check for environment variables with the same names (e.g., `LLM_API_KEY`, `LLM_BASE_URL`).
+
+### Manual Configuration Editing
+
+While the CLI is recommended, you can also edit the configuration file directly if needed. The file uses TOML format and will be automatically created with default values on first run.
 
 ## CLI Commands
 
@@ -207,13 +193,24 @@ The daemon automatically starts when you run `filesift find` or `filesift index`
 
 ### Configuration Management
 
-You can also use the CLI to manage all config related variables, if updating config files isn't your thing.
+The CLI provides comprehensive configuration management:
 
 ```bash
-# Set a configuration value (TODO: implementation pending)
-filesift config set KEY VALUE
+# List all configuration sections
+filesift config list
 
-# Show configuration file path
+# List all configuration with values
+filesift config list --all
+
+# List a specific section
+filesift config list llm
+
+# Set a configuration value (format: section.KEY)
+filesift config set llm.LLM_API_KEY "sk-your-key"
+filesift config set search.MAX_RESULTS 20
+filesift config set daemon.INACTIVITY_TIMEOUT 600
+
+# Show configuration file path (TODO: implementation pending)
 filesift config path
 ```
 
