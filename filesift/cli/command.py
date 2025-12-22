@@ -401,42 +401,93 @@ def list_config(section: Optional[str], show_all: bool):
 @click.argument("patterns", nargs=-1, required=False)
 def add_ignore(file_path: Optional[Path], patterns: tuple):
     """Add ignore patterns"""
-    # TODO: Implement add-ignore
-    # - If --file is provided, read patterns from file (one per line)
-    # - Otherwise, use patterns from command line
-    # - Add patterns to settings.EXCLUDED_DIRS or a separate ignore list
-    # - Persist to configuration file
-    if file_path:
-        click.echo(f"Adding ignore patterns from file: {file_path}")
-        # TODO: Read patterns from file
-    if patterns:
-        click.echo(f"Adding ignore patterns: {patterns}")
+    from filesift._config.config import load_config, save_config, config_dict
+
     if not file_path and not patterns:
         click.echo("Error: Must provide either --file or patterns", err=True)
         return
-    pass
+
+    new_patterns = []
+    if file_path:
+        try:
+            file_patterns = [line.strip() for line in file_path.read_text().splitlines()]
+            # Ignore empty lines and comments
+            file_patterns = [p for p in file_patterns if p and not p.startswith("#")]
+            new_patterns.extend(file_patterns)
+        except Exception as e:
+            click.echo(f"Error reading patterns from file: {e}", err=True)
+            return
+
+    if patterns:
+        new_patterns.extend([p.strip() for p in patterns if p.strip()])
+
+    if not new_patterns:
+        click.echo("No valid patterns provided.", err=True)
+        return
+
+    current_config = load_config()
+    excluded_dirs = current_config.get("indexing", {}).get("EXCLUDED_DIRS", [])
+
+    added = []
+    for pattern in new_patterns:
+        if pattern not in excluded_dirs:
+            excluded_dirs.append(pattern)
+            added.append(pattern)
+
+    if not added:
+        click.echo("No new patterns were added (all already present).")
+        return
+
+    # Persist
+    current_config.setdefault("indexing", {})["EXCLUDED_DIRS"] = excluded_dirs
+    save_config(current_config)
+    # Refresh global config_dict
+    import filesift._config.config as config_module
+    config_module.config_dict = load_config()
+
+    click.echo("Added ignore patterns:")
+    for pattern in added:
+        click.echo(f"  {pattern}")
 
 
 @config.command("remove-ignore")
 @click.argument("pattern", required=True)
 def remove_ignore(pattern: str):
     """Remove an ignore pattern"""
-    # TODO: Implement remove-ignore
-    # - Remove pattern from settings.EXCLUDED_DIRS or ignore list
-    # - Persist to configuration file
-    click.echo(f"Removing ignore pattern: {pattern}")
-    pass
+    from filesift._config.config import load_config, save_config
+
+    current_config = load_config()
+    excluded_dirs = current_config.get("indexing", {}).get("EXCLUDED_DIRS", [])
+
+    if pattern not in excluded_dirs:
+        click.echo(f"Pattern not found: {pattern}")
+        return
+
+    excluded_dirs = [p for p in excluded_dirs if p != pattern]
+    current_config.setdefault("indexing", {})["EXCLUDED_DIRS"] = excluded_dirs
+    save_config(current_config)
+    # Refresh global config_dict
+    import filesift._config.config as config_module
+    config_module.config_dict = load_config()
+
+    click.echo(f"Removed ignore pattern: {pattern}")
 
 
 @config.command("list-ignore")
 def list_ignore():
     """List all ignore patterns"""
-    # TODO: Implement list-ignore
-    # - Display all current ignore patterns
-    # - May need to read from settings or config file
+    from filesift._config.config import load_config
+
+    current_config = load_config()
+    excluded_dirs = current_config.get("indexing", {}).get("EXCLUDED_DIRS", [])
+
     click.echo("Current ignore patterns:")
-    # TODO: Display patterns
-    pass
+    if not excluded_dirs:
+        click.echo("  (none)")
+        return
+
+    for pattern in excluded_dirs:
+        click.echo(f"  {pattern}")
 
 
 @config.command()

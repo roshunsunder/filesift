@@ -210,8 +210,14 @@ filesift config set llm.LLM_API_KEY "sk-your-key"
 filesift config set search.MAX_RESULTS 20
 filesift config set daemon.INACTIVITY_TIMEOUT 600
 
-# Show configuration file path (TODO: implementation pending)
+# Show configuration file path
 filesift config path
+
+# Manage ignore patterns (indexing.EXCLUDED_DIRS)
+filesift config list-ignore
+filesift config add-ignore ".idea" ".tox"
+filesift config add-ignore --file ./ignore.txt
+filesift config remove-ignore ".idea"
 ```
 
 ## How It Works
