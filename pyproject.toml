@@ -19,7 +19,8 @@ dependencies = [
     "rank-bm25",
     "click",
     "tqdm",
-    "platformdirs"
+    "platformdirs",
+    "tomli-w"
 ]
 
 [project.optional-dependencies]

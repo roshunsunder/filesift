@@ -10,3 +10,4 @@ click
 tqdm
 platformdirs
 requests
+tomli-w
