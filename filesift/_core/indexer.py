@@ -227,21 +227,13 @@ class Indexer:
             print("No files to index.")
             return
         
-        # Create a static "description line" above the real progress bar
-        desc_line = tqdm(
-            total=1,
-            position=0,
-            bar_format="{desc}",  # show only the description text, no bar
-            leave=True           # do not leave it printed after completion
-        )
-
-        # Actual progress bar
+        # Create progress bar with dynamic description
         pbar = tqdm(
             total=len(indexable_files),
-            position=1,
             desc="",
             unit="file",
-            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}'
+            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}',
+            leave=False  # clear it after completion
         )
         
         # Second pass: process files with progress bar
@@ -257,8 +249,7 @@ class Indexer:
             if len(path_str) > 60:
                 path_str = "..." + path_str[-(60-3):]
             
-            desc_line.set_description_str(f"Indexing {path_str}:")
-            desc_line.refresh()
+            pbar.set_description_str(f"Indexing {path_str}")
             
             # Process the file (returns list of Documents/chunks)
             file_path_str = str(file_path)
@@ -290,8 +281,8 @@ class Indexer:
             # Update progress bar
             pbar.update(1)
         
+        # Close progress bar (with leave=False, it will clear itself)
         pbar.close()
-        desc_line.close()
                 
         # Update or create vector store
         if self.vector_store is None and documents:
