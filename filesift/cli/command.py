@@ -442,12 +442,13 @@ def list_ignore():
 @config.command()
 def path():
     """Show the path to the configuration file"""
-    # TODO: Implement path
-    # - Determine config file location (e.g., ~/.filesift/config.json or project-specific)
-    # - Display the path
-    click.echo("Configuration file path:")
-    # TODO: Display path
-    pass
+    from platformdirs import user_config_dir
+    from pathlib import Path
+    
+    config_dir = Path(user_config_dir("filesift"))
+    config_file = config_dir / "config.toml"
+    
+    click.echo(str(config_file))
 
 
 @cli.group()
