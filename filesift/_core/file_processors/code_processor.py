@@ -84,7 +84,7 @@ class CodeProcessor(BaseFileProcessor):
             messages = [{"role": "user", "content": prompt}]
             
             try:
-                code_model = config_dict["models"]["CODE_MODEL"]
+                code_model = config_dict["models"]["MAIN_MODEL"]
                 response = self.client.chat.completions.create(
                     model=code_model,
                     messages=messages,

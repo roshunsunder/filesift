@@ -101,7 +101,7 @@ filesift config set llm.LLM_API_KEY "ollama"
 # Model Configuration
 filesift config set models.EMBEDDING_MODEL "BAAI/bge-small-en-v1.5"
 filesift config set models.IMAGE_MODEL "google/gemma-3-4b"
-filesift config set models.CODE_MODEL "google/gemma-3-1b"
+filesift config set models.MAIN_MODEL "google/gemma-3-1b"
 
 # Search Settings
 filesift config set search.MAX_RESULTS 10
