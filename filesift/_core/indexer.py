@@ -149,7 +149,6 @@ class Indexer:
                 
             result = processor.process(file_path)
             summary = result["summary"]
-            print(summary)
             
             # For images, descriptions are typically short - don't chunk
             # For code and other text files, chunk the content

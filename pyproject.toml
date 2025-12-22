@@ -20,7 +20,11 @@ dependencies = [
     "click",
     "tqdm",
     "platformdirs",
-    "tomli-w"
+    "tomli-w",
+    "PyPDF2",
+    "python-docx",
+    "odfpy",
+    "PyYAML"
 ]
 
 [project.optional-dependencies]

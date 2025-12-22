@@ -1,16 +1,35 @@
 from pathlib import Path
 from typing import Dict, Any, Set, Optional
+from openai import OpenAI
+import tiktoken
 
 from .base import BaseFileProcessor
+from filesift._config.config import config_dict
 
 class DocumentProcessor(BaseFileProcessor):
     """Processor for handling document files (PDF, DOCX, ODT)"""
     
-    def __init__(self):
+    def __init__(self, max_tokens_for_summary: int = 2000):
         super().__init__()
         self.supported_extensions: Set[str] = {
             ".pdf", ".docx", ".odt"
         }
+        
+        # Initialize OpenAI client with config
+        llm_api_key = config_dict["llm"]["LLM_API_KEY"]
+        llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
+        if llm_base_url and len(llm_base_url) > 0:
+            self.client = OpenAI(api_key=llm_api_key, base_url=llm_base_url)
+        else:
+            self.client = OpenAI(api_key=llm_api_key)
+        
+        # Reserve tokens for prompt and response
+        self.max_tokens_for_summary = max_tokens_for_summary
+        # Use cl100k_base encoding (used by GPT models)
+        try:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+        except:
+            self.encoding = None
         
         # Try to import optional dependencies
         self.pdf_available = False
@@ -49,27 +68,83 @@ class DocumentProcessor(BaseFileProcessor):
             return False
         return ext in self.supported_extensions
     
+    def _truncate_content_for_summary(self, content: str) -> str:
+        """Truncate content to fit within token limit for LLM summarization"""
+        if self.encoding is None:
+            # Fallback: rough estimate (1 token ≈ 4 characters)
+            max_chars = self.max_tokens_for_summary * 4
+            if len(content) <= max_chars:
+                return content
+            # Truncate and add indicator
+            return content[:max_chars] + "\n\n[... content truncated for summary ...]"
+        
+        # Count tokens in the content
+        tokens = self.encoding.encode(content)
+        if len(tokens) <= self.max_tokens_for_summary:
+            return content
+        
+        # Truncate to fit within token limit
+        truncated_tokens = tokens[:self.max_tokens_for_summary]
+        truncated_content = self.encoding.decode(truncated_tokens)
+        
+        # Add truncation indicator
+        return truncated_content + "\n\n[... content truncated for summary ...]"
+    
+    def _generate_llm_summary(self, file_path: Path, content: str, doc_type: str) -> str:
+        """Generate summary using LLM"""
+        file_info = self.extract_file_info(file_path)
+        content_for_summary = self._truncate_content_for_summary(content)
+        
+        prompt = (
+            f"Here is some information about a {doc_type} document file:\n{file_info}\n"
+            "Analyze this document content and provide a concise, technical summary for a search index. "
+            "Focus on the main topics, key information, structure, and important details. "
+            "Do not include the full content or conversational filler. "
+            "Start directly with the description.\n"
+            f"```\n{content_for_summary}\n```"
+        )
+        messages = [{"role": "user", "content": prompt}]
+        
+        try:
+            model = config_dict["models"]["MAIN_MODEL"]
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # If LLM call fails, use a fallback summary
+            self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
+            return f"{doc_type} document: {file_path.name}\n{file_info}"
+    
     def process(self, file_path: Path) -> Dict[str, Any]:
         """Process a document file"""
         try:
             ext = file_path.suffix.lower()
             
             if ext == ".pdf":
-                content, summary = self._process_pdf(file_path)
+                content = self._process_pdf(file_path)
             elif ext == ".docx":
-                content, summary = self._process_docx(file_path)
+                content = self._process_docx(file_path)
             elif ext == ".odt":
-                content, summary = self._process_odt(file_path)
+                content = self._process_odt(file_path)
             else:
                 # Fallback
                 content = ""
+            
+            # Generate summary using LLM
+            doc_type = self._detect_document_type(file_path)
+            if content:
+                summary = self._generate_llm_summary(file_path, content, doc_type)
+            else:
                 summary = f"{self.extract_file_info(file_path)}\n\nUnsupported document format."
             
             return {
                 "content": content,
                 "summary": summary,
                 "file_type": "document",
-                "document_type": self._detect_document_type(file_path),
+                "document_type": doc_type,
                 "metadata": {
                     "path": str(file_path),
                     "size": file_path.stat().st_size,
@@ -80,8 +155,8 @@ class DocumentProcessor(BaseFileProcessor):
             self.logger.error(f"Error processing document file {file_path}: {str(e)}")
             raise
     
-    def _process_pdf(self, file_path: Path) -> tuple[str, str]:
-        """Process PDF file"""
+    def _process_pdf(self, file_path: Path) -> str:
+        """Process PDF file and return extracted text content"""
         if not self.pdf_available:
             raise ImportError("PyPDF2 is required for PDF processing. Install with: pip install PyPDF2")
         
@@ -99,26 +174,13 @@ class DocumentProcessor(BaseFileProcessor):
                 if num_pages > 10:
                     text_parts.append(f"\n[... {num_pages - 10} more pages ...]")
             
-            content = "\n\n".join(text_parts)
-            
-            file_info = self.extract_file_info(file_path)
-            
-            summary = f"{file_info}\n\nPDF Document:\n"
-            summary += f"Total pages: {num_pages}\n"
-            summary += f"Extracted text from first {min(10, num_pages)} pages:\n\n"
-            summary += content[:2000]
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return "\n\n".join(text_parts)
         except Exception as e:
             self.logger.warning(f"Error processing PDF {file_path}: {str(e)}")
-            file_info = self.extract_file_info(file_path)
-            summary = f"{file_info}\n\nError extracting text from PDF: {str(e)}"
-            return "", summary
+            return ""
     
-    def _process_docx(self, file_path: Path) -> tuple[str, str]:
-        """Process DOCX file"""
+    def _process_docx(self, file_path: Path) -> str:
+        """Process DOCX file and return extracted text content"""
         if not self.docx_available:
             raise ImportError("python-docx is required for DOCX processing. Install with: pip install python-docx")
         
@@ -142,24 +204,13 @@ class DocumentProcessor(BaseFileProcessor):
             if table_texts:
                 content += "\n\n--- Tables ---\n" + "\n\n".join(table_texts)
             
-            file_info = self.extract_file_info(file_path)
-            
-            summary = f"{file_info}\n\nDOCX Document:\n"
-            summary += f"Paragraphs: {len(paragraphs)}\n"
-            summary += f"Tables: {len(doc.tables)}\n\n"
-            summary += "Content:\n" + content[:2000]
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return content
         except Exception as e:
             self.logger.warning(f"Error processing DOCX {file_path}: {str(e)}")
-            file_info = self.extract_file_info(file_path)
-            summary = f"{file_info}\n\nError extracting text from DOCX: {str(e)}"
-            return "", summary
+            return ""
     
-    def _process_odt(self, file_path: Path) -> tuple[str, str]:
-        """Process ODT file"""
+    def _process_odt(self, file_path: Path) -> str:
+        """Process ODT file and return extracted text content"""
         if not self.odt_available:
             raise ImportError("odfpy is required for ODT processing. Install with: pip install odfpy")
         
@@ -176,22 +227,10 @@ class DocumentProcessor(BaseFileProcessor):
                 if text.strip():
                     paragraphs.append(text.strip())
             
-            content = "\n".join(paragraphs)
-            
-            file_info = self.extract_file_info(file_path)
-            
-            summary = f"{file_info}\n\nODT Document:\n"
-            summary += f"Paragraphs: {len(paragraphs)}\n\n"
-            summary += "Content:\n" + content[:2000]
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return "\n".join(paragraphs)
         except Exception as e:
             self.logger.warning(f"Error processing ODT {file_path}: {str(e)}")
-            file_info = self.extract_file_info(file_path)
-            summary = f"{file_info}\n\nError extracting text from ODT: {str(e)}"
-            return "", summary
+            return ""
     
     def _detect_document_type(self, file_path: Path) -> str:
         """Detect the type of document file"""

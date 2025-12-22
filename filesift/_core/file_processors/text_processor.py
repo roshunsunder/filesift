@@ -1,13 +1,16 @@
 from pathlib import Path
 from typing import Dict, Any, Set
 from langchain_community.document_loaders import TextLoader
+from openai import OpenAI
+import tiktoken
 
 from .base import BaseFileProcessor
+from filesift._config.config import config_dict
 
 class TextProcessor(BaseFileProcessor):
     """Processor for handling plain text files"""
     
-    def __init__(self):
+    def __init__(self, max_tokens_for_summary: int = 2000):
         super().__init__()
         self.supported_extensions: Set[str] = {
             ".txt", ".md", ".markdown", ".rst", ".log", ".text",
@@ -15,8 +18,74 @@ class TextProcessor(BaseFileProcessor):
             ".gitignore", ".gitattributes", ".editorconfig"
         }
         
+        # Initialize OpenAI client with config
+        llm_api_key = config_dict["llm"]["LLM_API_KEY"]
+        llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
+        if llm_base_url and len(llm_base_url) > 0:
+            self.client = OpenAI(api_key=llm_api_key, base_url=llm_base_url)
+        else:
+            self.client = OpenAI(api_key=llm_api_key)
+        
+        # Reserve tokens for prompt and response
+        self.max_tokens_for_summary = max_tokens_for_summary
+        # Use cl100k_base encoding (used by GPT models)
+        try:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+        except:
+            self.encoding = None
+        
     def can_handle(self, file_path: Path) -> bool:
         return file_path.suffix.lower() in self.supported_extensions
+    
+    def _truncate_content_for_summary(self, content: str) -> str:
+        """Truncate content to fit within token limit for LLM summarization"""
+        if self.encoding is None:
+            # Fallback: rough estimate (1 token ≈ 4 characters)
+            max_chars = self.max_tokens_for_summary * 4
+            if len(content) <= max_chars:
+                return content
+            # Truncate and add indicator
+            return content[:max_chars] + "\n\n[... content truncated for summary ...]"
+        
+        # Count tokens in the content
+        tokens = self.encoding.encode(content)
+        if len(tokens) <= self.max_tokens_for_summary:
+            return content
+        
+        # Truncate to fit within token limit
+        truncated_tokens = tokens[:self.max_tokens_for_summary]
+        truncated_content = self.encoding.decode(truncated_tokens)
+        
+        # Add truncation indicator
+        return truncated_content + "\n\n[... content truncated for summary ...]"
+    
+    def _generate_llm_summary(self, file_path: Path, content: str, text_type: str) -> str:
+        """Generate summary using LLM"""
+        file_info = self.extract_file_info(file_path)
+        content_for_summary = self._truncate_content_for_summary(content)
+        
+        prompt = (
+            f"Here is some information about a {text_type} text file:\n{file_info}\n"
+            "Analyze this text file content and provide a concise, technical summary for a search index. "
+            "Focus on the main topics, key information, structure, and important details. "
+            "Do not include the full content or conversational filler. "
+            "Start directly with the description.\n"
+            f"```\n{content_for_summary}\n```"
+        )
+        messages = [{"role": "user", "content": prompt}]
+        
+        try:
+            model = config_dict["models"]["MAIN_MODEL"]
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # If LLM call fails, use a fallback summary
+            self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
+            return f"{text_type} text file: {file_path.name}\n{file_info}"
     
     def process(self, file_path: Path) -> Dict[str, Any]:
         """Process a plain text file"""
@@ -25,20 +94,18 @@ class TextProcessor(BaseFileProcessor):
             doc = loader.load()
             content = "".join([page.page_content for page in doc])
             
-            file_info = self.extract_file_info(file_path)
-            
-            # For markdown files, include structure info in summary
-            if file_path.suffix.lower() in {".md", ".markdown"}:
-                summary = self._create_markdown_summary(file_path, content)
+            # Generate summary using LLM
+            text_type = self._detect_text_type(file_path)
+            if content:
+                summary = self._generate_llm_summary(file_path, content, text_type)
             else:
-                # Create a simple summary from first lines
-                summary = self._create_text_summary(file_path, content)
+                summary = f"{self.extract_file_info(file_path)}\n\nEmpty text file."
             
             return {
                 "content": content,
                 "summary": summary,
                 "file_type": "text",
-                "text_type": self._detect_text_type(file_path),
+                "text_type": text_type,
                 "metadata": {
                     "path": str(file_path),
                     "size": file_path.stat().st_size,
@@ -48,52 +115,6 @@ class TextProcessor(BaseFileProcessor):
         except Exception as e:
             self.logger.error(f"Error processing text file {file_path}: {str(e)}")
             raise
-    
-    def _create_text_summary(self, file_path: Path, content: str) -> str:
-        """Create a summary from the first portion of text content"""
-        lines = content.split('\n')
-        first_lines = lines[:20]  # First 20 lines
-        preview = '\n'.join(first_lines)
-        
-        if len(lines) > 20:
-            preview += f"\n\n[... {len(lines) - 20} more lines ...]"
-        
-        file_info = self.extract_file_info(file_path)
-        return f"{file_info}\n\nContent preview:\n{preview}"
-    
-    def _create_markdown_summary(self, file_path: Path, content: str) -> str:
-        """Create a summary for markdown files, extracting structure"""
-        lines = content.split('\n')
-        
-        # Extract headers and structure
-        headers = []
-        for line in lines[:100]:  # Check first 100 lines for headers
-            stripped = line.strip()
-            if stripped.startswith('#'):
-                level = len(stripped) - len(stripped.lstrip('#'))
-                header_text = stripped.lstrip('#').strip()
-                if header_text:
-                    headers.append(f"{'  ' * (level - 1)}- {header_text}")
-        
-        file_info = self.extract_file_info(file_path)
-        
-        summary_parts = [file_info]
-        
-        if headers:
-            summary_parts.append("\nDocument structure:")
-            summary_parts.extend(headers[:15])  # Limit to 15 headers
-            if len(headers) > 15:
-                summary_parts.append(f"\n[... {len(headers) - 15} more sections ...]")
-        
-        # Add content preview
-        preview_lines = lines[:30]
-        preview = '\n'.join(preview_lines)
-        if len(lines) > 30:
-            preview += f"\n\n[... {len(lines) - 30} more lines ...]"
-        
-        summary_parts.append(f"\n\nContent preview:\n{preview}")
-        
-        return '\n'.join(summary_parts)
     
     def _detect_text_type(self, file_path: Path) -> str:
         """Detect the type of text file based on extension"""

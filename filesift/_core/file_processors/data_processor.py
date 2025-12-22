@@ -3,8 +3,11 @@ from typing import Dict, Any, Set
 import json
 import csv
 import xml.etree.ElementTree as ET
+from openai import OpenAI
+import tiktoken
 
 from .base import BaseFileProcessor
+from filesift._config.config import config_dict
 
 # Optional dependencies
 try:
@@ -22,11 +25,27 @@ except ImportError:
 class DataProcessor(BaseFileProcessor):
     """Processor for handling structured data files"""
     
-    def __init__(self):
+    def __init__(self, max_tokens_for_summary: int = 2000):
         super().__init__()
         self.supported_extensions: Set[str] = {
             ".json", ".yaml", ".yml", ".xml", ".csv", ".toml"
         }
+        
+        # Initialize OpenAI client with config
+        llm_api_key = config_dict["llm"]["LLM_API_KEY"]
+        llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
+        if llm_base_url and len(llm_base_url) > 0:
+            self.client = OpenAI(api_key=llm_api_key, base_url=llm_base_url)
+        else:
+            self.client = OpenAI(api_key=llm_api_key)
+        
+        # Reserve tokens for prompt and response
+        self.max_tokens_for_summary = max_tokens_for_summary
+        # Use cl100k_base encoding (used by GPT models)
+        try:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+        except:
+            self.encoding = None
         
     def can_handle(self, file_path: Path) -> bool:
         ext = file_path.suffix.lower()
@@ -36,31 +55,87 @@ class DataProcessor(BaseFileProcessor):
             return False
         return ext in self.supported_extensions
     
+    def _truncate_content_for_summary(self, content: str) -> str:
+        """Truncate content to fit within token limit for LLM summarization"""
+        if self.encoding is None:
+            # Fallback: rough estimate (1 token ≈ 4 characters)
+            max_chars = self.max_tokens_for_summary * 4
+            if len(content) <= max_chars:
+                return content
+            # Truncate and add indicator
+            return content[:max_chars] + "\n\n[... content truncated for summary ...]"
+        
+        # Count tokens in the content
+        tokens = self.encoding.encode(content)
+        if len(tokens) <= self.max_tokens_for_summary:
+            return content
+        
+        # Truncate to fit within token limit
+        truncated_tokens = tokens[:self.max_tokens_for_summary]
+        truncated_content = self.encoding.decode(truncated_tokens)
+        
+        # Add truncation indicator
+        return truncated_content + "\n\n[... content truncated for summary ...]"
+    
+    def _generate_llm_summary(self, file_path: Path, content: str, data_type: str) -> str:
+        """Generate summary using LLM"""
+        file_info = self.extract_file_info(file_path)
+        content_for_summary = self._truncate_content_for_summary(content)
+        
+        prompt = (
+            f"Here is some information about a {data_type} data file:\n{file_info}\n"
+            "Analyze this data file content and provide a concise, technical summary for a search index. "
+            "Focus on the data structure, key fields, important values, and what this data represents. "
+            "Do not include the full content or conversational filler. "
+            "Start directly with the description.\n"
+            f"```\n{content_for_summary}\n```"
+        )
+        messages = [{"role": "user", "content": prompt}]
+        
+        try:
+            model = config_dict["models"]["MAIN_MODEL"]
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # If LLM call fails, use a fallback summary
+            self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
+            return f"{data_type} data file: {file_path.name}\n{file_info}"
+    
     def process(self, file_path: Path) -> Dict[str, Any]:
         """Process a structured data file"""
         try:
             ext = file_path.suffix.lower()
             
             if ext == ".json":
-                content, summary = self._process_json(file_path)
+                content = self._process_json(file_path)
             elif ext in {".yaml", ".yml"}:
-                content, summary = self._process_yaml(file_path)
+                content = self._process_yaml(file_path)
             elif ext == ".xml":
-                content, summary = self._process_xml(file_path)
+                content = self._process_xml(file_path)
             elif ext == ".csv":
-                content, summary = self._process_csv(file_path)
+                content = self._process_csv(file_path)
             elif ext == ".toml":
-                content, summary = self._process_toml(file_path)
+                content = self._process_toml(file_path)
             else:
                 # Fallback: read as text
                 content = file_path.read_text(encoding='utf-8', errors='ignore')
-                summary = self._create_fallback_summary(file_path, content)
+            
+            # Generate summary using LLM
+            data_type = self._detect_data_type(file_path)
+            if content:
+                summary = self._generate_llm_summary(file_path, content, data_type)
+            else:
+                summary = f"{self.extract_file_info(file_path)}\n\nEmpty or unreadable data file."
             
             return {
                 "content": content,
                 "summary": summary,
                 "file_type": "data",
-                "data_type": self._detect_data_type(file_path),
+                "data_type": data_type,
                 "metadata": {
                     "path": str(file_path),
                     "size": file_path.stat().st_size,
@@ -71,30 +146,19 @@ class DataProcessor(BaseFileProcessor):
             self.logger.error(f"Error processing data file {file_path}: {str(e)}")
             raise
     
-    def _process_json(self, file_path: Path) -> tuple[str, str]:
-        """Process JSON file"""
+    def _process_json(self, file_path: Path) -> str:
+        """Process JSON file and return formatted content"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            content = json.dumps(data, indent=2)
-            file_info = self.extract_file_info(file_path)
-            
-            # Create summary with structure info
-            structure = self._describe_json_structure(data)
-            summary = f"{file_info}\n\nJSON Structure:\n{structure}\n\nContent:\n{content[:2000]}"
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return json.dumps(data, indent=2)
         except json.JSONDecodeError as e:
             self.logger.warning(f"Invalid JSON in {file_path}: {str(e)}")
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
-            summary = f"{self.extract_file_info(file_path)}\n\nInvalid JSON file. Raw content:\n{content[:1000]}"
-            return content, summary
+            return file_path.read_text(encoding='utf-8', errors='ignore')
     
-    def _process_yaml(self, file_path: Path) -> tuple[str, str]:
-        """Process YAML file"""
+    def _process_yaml(self, file_path: Path) -> str:
+        """Process YAML file and return formatted content"""
         if not yaml_available:
             raise ImportError("PyYAML is required for YAML processing. Install with: pip install PyYAML")
         
@@ -102,49 +166,26 @@ class DataProcessor(BaseFileProcessor):
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f)
             
-            content = yaml.dump(data, default_flow_style=False, allow_unicode=True)
-            file_info = self.extract_file_info(file_path)
-            
-            # Create summary with structure info
-            structure = self._describe_yaml_structure(data)
-            summary = f"{file_info}\n\nYAML Structure:\n{structure}\n\nContent:\n{content[:2000]}"
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return yaml.dump(data, default_flow_style=False, allow_unicode=True)
         except yaml.YAMLError as e:
             self.logger.warning(f"Invalid YAML in {file_path}: {str(e)}")
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
-            summary = f"{self.extract_file_info(file_path)}\n\nInvalid YAML file. Raw content:\n{content[:1000]}"
-            return content, summary
+            return file_path.read_text(encoding='utf-8', errors='ignore')
     
-    def _process_xml(self, file_path: Path) -> tuple[str, str]:
-        """Process XML file"""
+    def _process_xml(self, file_path: Path) -> str:
+        """Process XML file and return formatted content"""
         try:
             tree = ET.parse(file_path)
             root = tree.getroot()
             
             # Get XML as string
             ET.indent(tree, space="  ")
-            content = ET.tostring(root, encoding='unicode')
-            
-            file_info = self.extract_file_info(file_path)
-            
-            # Describe XML structure
-            structure = self._describe_xml_structure(root)
-            summary = f"{file_info}\n\nXML Structure:\n{structure}\n\nContent:\n{content[:2000]}"
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return ET.tostring(root, encoding='unicode')
         except ET.ParseError as e:
             self.logger.warning(f"Invalid XML in {file_path}: {str(e)}")
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
-            summary = f"{self.extract_file_info(file_path)}\n\nInvalid XML file. Raw content:\n{content[:1000]}"
-            return content, summary
+            return file_path.read_text(encoding='utf-8', errors='ignore')
     
-    def _process_csv(self, file_path: Path) -> tuple[str, str]:
-        """Process CSV file"""
+    def _process_csv(self, file_path: Path) -> str:
+        """Process CSV file and return JSON-formatted content"""
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 # Try to detect delimiter
@@ -156,57 +197,27 @@ class DataProcessor(BaseFileProcessor):
                 reader = csv.DictReader(f, delimiter=delimiter)
                 rows = list(reader)
                 
-                # Get headers
-                headers = reader.fieldnames or []
-                
                 # Convert to JSON-like structure for content
                 content = json.dumps(rows[:100], indent=2)  # Limit to first 100 rows
                 if len(rows) > 100:
                     content += f"\n[... {len(rows) - 100} more rows ...]"
-            
-            file_info = self.extract_file_info(file_path)
-            
-            summary = f"{file_info}\n\nCSV Structure:\n"
-            summary += f"Columns: {', '.join(headers)}\n"
-            summary += f"Total rows: {len(rows)}\n\n"
-            summary += f"Sample data (first 5 rows):\n{json.dumps(rows[:5], indent=2)}"
-            if len(rows) > 5:
-                summary += f"\n[... {len(rows) - 5} more rows ...]"
-            
-            return content, summary
+                
+                return content
         except Exception as e:
             self.logger.warning(f"Error processing CSV {file_path}: {str(e)}")
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
-            summary = f"{self.extract_file_info(file_path)}\n\nCSV file. Raw content:\n{content[:1000]}"
-            return content, summary
+            return file_path.read_text(encoding='utf-8', errors='ignore')
     
-    def _process_toml(self, file_path: Path) -> tuple[str, str]:
-        """Process TOML file"""
+    def _process_toml(self, file_path: Path) -> str:
+        """Process TOML file and return content"""
         if not tomllib_available:
             raise ImportError("tomllib is required for TOML processing (Python 3.11+)")
         
         try:
             # Read content as text for output
-            content = file_path.read_text(encoding='utf-8')
-            
-            # Parse with tomllib for structure analysis (requires binary mode)
-            with open(file_path, 'rb') as f:
-                data = tomllib.load(f)
-            
-            file_info = self.extract_file_info(file_path)
-            
-            # Create summary with structure info
-            structure = self._describe_toml_structure(data)
-            summary = f"{file_info}\n\nTOML Structure:\n{structure}\n\nContent:\n{content[:2000]}"
-            if len(content) > 2000:
-                summary += "\n[... content truncated ...]"
-            
-            return content, summary
+            return file_path.read_text(encoding='utf-8')
         except Exception as e:
             self.logger.warning(f"Invalid TOML in {file_path}: {str(e)}")
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
-            summary = f"{self.extract_file_info(file_path)}\n\nInvalid TOML file. Raw content:\n{content[:1000]}"
-            return content, summary
+            return file_path.read_text(encoding='utf-8', errors='ignore')
     
     def _describe_json_structure(self, data: Any, depth: int = 0, max_depth: int = 3) -> str:
         """Describe the structure of a JSON object"""
@@ -265,14 +276,6 @@ class DataProcessor(BaseFileProcessor):
                 lines.append(f"  ... and {len(children) - 10} more elements")
         
         return "\n".join(lines)
-    
-    def _create_fallback_summary(self, file_path: Path, content: str) -> str:
-        """Create a fallback summary for unhandled data files"""
-        file_info = self.extract_file_info(file_path)
-        preview = content[:1000]
-        if len(content) > 1000:
-            preview += "\n[... content truncated ...]"
-        return f"{file_info}\n\nContent:\n{preview}"
     
     def _detect_data_type(self, file_path: Path) -> str:
         """Detect the type of data file"""
