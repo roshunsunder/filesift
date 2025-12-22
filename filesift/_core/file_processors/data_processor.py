@@ -14,10 +14,10 @@ except ImportError:
     yaml_available = False
 
 try:
-    import toml
-    toml_available = True
+    import tomllib
+    tomllib_available = True
 except ImportError:
-    toml_available = False
+    tomllib_available = False
 
 class DataProcessor(BaseFileProcessor):
     """Processor for handling structured data files"""
@@ -32,7 +32,7 @@ class DataProcessor(BaseFileProcessor):
         ext = file_path.suffix.lower()
         if ext in {".yaml", ".yml"} and not yaml_available:
             return False
-        if ext == ".toml" and not toml_available:
+        if ext == ".toml" and not tomllib_available:
             return False
         return ext in self.supported_extensions
     
@@ -182,14 +182,17 @@ class DataProcessor(BaseFileProcessor):
     
     def _process_toml(self, file_path: Path) -> tuple[str, str]:
         """Process TOML file"""
-        if not toml_available:
-            raise ImportError("toml is required for TOML processing. Install with: pip install toml")
+        if not tomllib_available:
+            raise ImportError("tomllib is required for TOML processing (Python 3.11+)")
         
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = toml.load(f)
+            # Read content as text for output
+            content = file_path.read_text(encoding='utf-8')
             
-            content = toml.dumps(data)
+            # Parse with tomllib for structure analysis (requires binary mode)
+            with open(file_path, 'rb') as f:
+                data = tomllib.load(f)
+            
             file_info = self.extract_file_info(file_path)
             
             # Create summary with structure info
