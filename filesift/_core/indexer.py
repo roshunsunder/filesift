@@ -23,6 +23,10 @@ from filesift._config.config import config_dict
 from .file_processors.base import BaseFileProcessor
 from .file_processors.code_processor import CodeProcessor
 from .file_processors.image_processor import ImageProcessor
+from .file_processors.text_processor import TextProcessor
+from .file_processors.data_processor import DataProcessor
+from .file_processors.config_processor import ConfigProcessor
+from .file_processors.document_processor import DocumentProcessor
 
 class IndexMetadata:
     """Stores metadata about the index"""
@@ -71,7 +75,11 @@ class Indexer:
         # Initialize processors
         self.processors: List[BaseFileProcessor] = [
             CodeProcessor(),
-            ImageProcessor()  # Uses default model loaded in LM Studio
+            ImageProcessor(),  # Uses default model loaded in LM Studio
+            TextProcessor(),
+            DataProcessor(),
+            ConfigProcessor(),
+            DocumentProcessor(),
         ]
         
         # Initialize vector store

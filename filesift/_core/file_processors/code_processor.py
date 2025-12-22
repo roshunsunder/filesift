@@ -91,7 +91,6 @@ class CodeProcessor(BaseFileProcessor):
                     temperature=0
                 )
                 summary = response.choices[0].message.content
-                print(summary)
             except Exception as e:
                 # If LLM call fails, use a fallback summary
                 self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
