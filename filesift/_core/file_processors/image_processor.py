@@ -11,7 +11,7 @@ class ImageProcessor(BaseFileProcessor):
     
     def __init__(self, model_name: Optional[str] = None):
         super().__init__()
-        self.model_name = model_name or config_dict["models"]["IMAGE_MODEL"]
+        self.model_name = model_name or config_dict["models"]["IMAGE_MODEL"] or config_dict["models"]["MAIN_MODEL"]
         # LM Studio supports JPEG, PNG, and WebP, but we'll keep broader support
         # for files that might be converted or handled elsewhere
         self.supported_extensions: Set[str] = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
