@@ -12,11 +12,11 @@ INDEX_DIR_NAME = "faiss_index"
 # Embedding model for semantic search
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
-# Image processing model (for LM Studio VLM)
-IMAGE_MODEL = "google/gemma-3-4b"
+# Image processing model
+IMAGE_MODEL = ""
 
-# Main model for general text-related tasks (for LM Studio)
-MAIN_MODEL = "google/gemma-3-1b"
+# Main model for general text-related tasks
+MAIN_MODEL = "gpt-4.1"
 
 # LLM settings
 [llm]
