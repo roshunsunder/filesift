@@ -46,23 +46,15 @@ Before you can start indexing, you need to configure your LLM provider settings.
 
    **For OpenAI** (cloud):
    ```bash
-   filesift config set llm.LLM_BASE_URL ""
    filesift config set llm.LLM_API_KEY "sk-your-openai-api-key"
    filesift config set models.MAIN_MODEL "gpt-4o-mini"
    ```
 
-   **For LM Studio** (local):
+   **For LM Studio / Ollama / etc.** (local):
    ```bash
-   filesift config set llm.LLM_BASE_URL "http://localhost:1234/v1"
-   filesift config set llm.LLM_API_KEY "lm-studio"
+   filesift config set llm.LLM_BASE_URL "http://localhost:{SERVER_PORT}/v1"
+   filesift config set llm.LLM_API_KEY "your-api-key"
    filesift config set models.MAIN_MODEL "your-model-name"
-   ```
-
-   **For Ollama** (local):
-   ```bash
-   filesift config set llm.LLM_BASE_URL "http://localhost:11434/v1"
-   filesift config set llm.LLM_API_KEY "ollama"
-   filesift config set models.MAIN_MODEL "llama3.2"
    ```
 
    > **Note**: Leave `LLM_BASE_URL` empty (`""`) to use OpenAI's cloud API. For local providers, set the base URL to your local server's endpoint.
