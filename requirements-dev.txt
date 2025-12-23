@@ -9,5 +9,11 @@ rank-bm25
 click
 tqdm
 platformdirs
+tomli-w
+PyPDF2
+python-docx
+odfpy
+PyYAML
 
 build
+twine

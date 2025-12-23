@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import logging
@@ -64,7 +67,6 @@ class QueryDriver:
             self.logger.error(f"Error loading vector store: {str(e)}")
             raise
 
-        # Load BM25 index and documents
         try:
             with open(path_obj / "bm25_index.pkl", "rb") as f:
                 self.bm25_index = pickle.load(f)
@@ -131,17 +133,14 @@ class QueryDriver:
         # files like single-caption images.
         rrf_scores: Dict[str, float] = {}
 
-        # Best rank per path from semantic search
         semantic_best_ranks: Dict[str, int] = {}
         for rank, (doc, _) in enumerate(semantic_results):
             doc_path = doc.metadata.get("path", "")
             if not doc_path:
                 continue
-            # Keep the best (lowest) rank seen for this file
             if doc_path not in semantic_best_ranks:
                 semantic_best_ranks[doc_path] = rank
 
-        # Best rank per path from BM25 search
         bm25_best_ranks: Dict[str, int] = {}
         for rank, doc_idx in enumerate(bm25_results):
             if doc_idx >= len(self.bm25_documents):
@@ -153,11 +152,9 @@ class QueryDriver:
             if doc_path not in bm25_best_ranks:
                 bm25_best_ranks[doc_path] = rank
 
-        # Add semantic contributions
         for doc_path, rank in semantic_best_ranks.items():
             rrf_scores[doc_path] = rrf_scores.get(doc_path, 0.0) + alpha / (k + rank + 1)
 
-        # Add BM25 contributions
         for doc_path, rank in bm25_best_ranks.items():
             rrf_scores[doc_path] = rrf_scores.get(doc_path, 0.0) + (1 - alpha) / (k + rank + 1)
 
@@ -185,63 +182,52 @@ class QueryDriver:
 
         max_results = config_dict["search"]["MAX_RESULTS"]
         
-        # Perform semantic search
         semantic_results = self.vector_store.similarity_search_with_score(
             query, k=max_results * 2  # Get more candidates for hybrid search
         )
         
-        # Perform BM25 search if available
         if self.bm25_index and self.bm25_documents:
             tokenized_query = query.lower().split()
             bm25_scores = self.bm25_index.get_scores(tokenized_query)
-            # Get top-k BM25 results
             bm25_top_k = np.argsort(bm25_scores)[-max_results * 2:][::-1]
             bm25_top_k = [int(idx) for idx in bm25_top_k if bm25_scores[idx] > 0]
         else:
             bm25_top_k = []
         
-        # Combine results using RRF if BM25 is available, otherwise use semantic only
         if bm25_top_k:
-            # Hybrid search with RRF
             rrf_scores = self._reciprocal_rank_fusion(semantic_results, bm25_top_k)
             
-            # Create a mapping of path -> (doc, semantic_score) for easy lookup
             semantic_map: Dict[str, tuple[Document, float]] = {}
             for doc, score in semantic_results:
                 path = doc.metadata.get("path", "")
                 if not path:
                     continue
-                # Keep the first (best-ranked) semantic document per path
                 if path not in semantic_map:
                     semantic_map[path] = (doc, 1.0 - score)
             
-            # Sort by RRF score and create SearchResult objects
             sorted_paths = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
             results = []
             
             for path, rrf_score in sorted_paths[:max_results]:
                 if path in semantic_map:
                     doc, semantic_sim = semantic_map[path]
-                    # Use RRF score as the final score
                     results.append(SearchResult(
                         path=path,
                         score=rrf_score,
                         metadata=doc.metadata
                     ))
         else:
-            # Semantic search only (fallback if BM25 not available)
             similarity_threshold = config_dict["search"]["SIMILARITY_THRESHOLD"]
             results = [
                 SearchResult(
                     path=doc.metadata["path"],
-                    score=1.0 - score,  # Convert distance to similarity (higher = better)
+                    score=1.0 - score,
                     metadata=doc.metadata
                 )
                 for doc, score in semantic_results
                 if (1.0 - score) >= similarity_threshold
             ][:max_results]
         
-        # Apply filters
         results = self._apply_filters(results, filters)
 
         return results

@@ -8,6 +8,40 @@ version = "0.1.0"
 description = "Intelligent file indexing and search system"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Roshun Sunder", email = "roshun.sunder@gmail.com"}
+]
+maintainers = [
+    {name = "Roshun Sunder", email = "roshun.sunder@gmail.com"}
+]
+keywords = [
+    "file-search",
+    "semantic-search",
+    "vector-search",
+    "file-indexing",
+    "code-search",
+    "document-search",
+    "faiss",
+    "llm",
+    "embeddings",
+    "natural-language-search"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Filesystems",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Utilities"
+]
+urls = {Homepage = "https://github.com/roshunsunder/filesift"}
 dependencies = [
     "langchain-community",
     "langchain_huggingface",
@@ -19,7 +53,12 @@ dependencies = [
     "rank-bm25",
     "click",
     "tqdm",
-    "platformdirs"
+    "platformdirs",
+    "tomli-w",
+    "PyPDF2",
+    "python-docx",
+    "odfpy",
+    "PyYAML"
 ]
 
 [project.optional-dependencies]

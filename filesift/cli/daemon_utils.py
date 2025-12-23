@@ -33,12 +33,10 @@ def get_daemon_pid() -> Optional[int]:
     try:
         with open(DAEMON_PID_FILE, 'r') as f:
             pid = int(f.read().strip())
-        # Check if process is actually running
         try:
-            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            os.kill(pid, 0)
             return pid
         except OSError:
-            # Process doesn't exist, remove stale PID file
             DAEMON_PID_FILE.unlink()
             return None
     except (ValueError, IOError):
@@ -55,13 +53,12 @@ def start_daemon_process() -> bool:
     import sys
     daemon_script = Path(__file__).parent.parent / "_core" / "daemon_main.py"
     
-    # Start daemon in background
     try:
         process = subprocess.Popen(
             [sys.executable, str(daemon_script)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            start_new_session=True  # Detach from parent
+            start_new_session=True
         )
         save_daemon_pid(process.pid)
         return True
@@ -75,9 +72,8 @@ def ensure_daemon_running() -> bool:
     
     try:
         if start_daemon_process():
-            # Give it a moment to start
             import time
-            time.sleep(1.0)  # Wait for process startup
+            time.sleep(1.0)
             return is_daemon_running()
         else:
             return False

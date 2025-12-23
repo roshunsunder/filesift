@@ -10,3 +10,8 @@ click
 tqdm
 platformdirs
 requests
+tomli-w
+PyPDF2
+python-docx
+odfpy
+PyYAML

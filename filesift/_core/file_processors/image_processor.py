@@ -11,11 +11,8 @@ class ImageProcessor(BaseFileProcessor):
     
     def __init__(self, model_name: Optional[str] = None):
         super().__init__()
-        self.model_name = model_name or config_dict["models"]["IMAGE_MODEL"]
-        # LM Studio supports JPEG, PNG, and WebP, but we'll keep broader support
-        # for files that might be converted or handled elsewhere
+        self.model_name = model_name or config_dict["models"]["IMAGE_MODEL"] or config_dict["models"]["MAIN_MODEL"]
         self.supported_extensions: Set[str] = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-        # Initialize OpenAI client with config
         llm_api_key = config_dict["llm"]["LLM_API_KEY"]
         llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
         if llm_base_url and len(llm_base_url) > 0:
@@ -46,14 +43,11 @@ class ImageProcessor(BaseFileProcessor):
     def process(self, file_path: Path) -> Dict[str, Any]:
         """Process an image file using LM Studio VLM for captioning via OpenAI API"""
         try:
-            # Encode image to base64
             base64_image = self._encode_image(file_path)
             mime_type = self._get_image_mime_type(file_path)
             
-            # Create prompt for image description
             prompt = "Describe this image in detail, focusing on key visual elements, objects, people, text, colors, and any important details that would be useful for search and retrieval."
             
-            # Use OpenAI API format for vision models
             response = self.client.responses.create(
                 model=self.model_name,
                 input=[
@@ -70,13 +64,12 @@ class ImageProcessor(BaseFileProcessor):
                 ],
             )
             
-            # Extract description from response
             description = response.output_text
             
             return {
-                "content": description,
+                "summary": description,
                 "file_type": "image",
-                "image_type": file_path.suffix.lower()[1:],  # Remove the dot
+                "image_type": file_path.suffix.lower()[1:],
                 "metadata": {
                     "path": str(file_path),
                     "size": file_path.stat().st_size,
