@@ -53,7 +53,6 @@ def start_daemon_process() -> bool:
     import sys
     daemon_script = Path(__file__).parent.parent / "_core" / "daemon_main.py"
     
-    # Start daemon in background
     try:
         process = subprocess.Popen(
             [sys.executable, str(daemon_script)],
