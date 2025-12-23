@@ -38,17 +38,46 @@ pip install filesift
 
 ## Quick Start
 
-1. **Index a directory**:
+### Initial Setup
+
+Before you can start indexing, you need to configure your LLM provider settings. FileSift works with any OpenAI-compatible API, including OpenAI, LM Studio, Ollama, and others.
+
+1. **Configure your LLM provider**:
+
+   **For OpenAI** (cloud):
+   ```bash
+   filesift config set llm.LLM_BASE_URL ""
+   filesift config set llm.LLM_API_KEY "sk-your-openai-api-key"
+   filesift config set models.MAIN_MODEL "gpt-4o-mini"
+   ```
+
+   **For LM Studio** (local):
+   ```bash
+   filesift config set llm.LLM_BASE_URL "http://localhost:1234/v1"
+   filesift config set llm.LLM_API_KEY "lm-studio"
+   filesift config set models.MAIN_MODEL "your-model-name"
+   ```
+
+   **For Ollama** (local):
+   ```bash
+   filesift config set llm.LLM_BASE_URL "http://localhost:11434/v1"
+   filesift config set llm.LLM_API_KEY "ollama"
+   filesift config set models.MAIN_MODEL "llama3.2"
+   ```
+
+   > **Note**: Leave `LLM_BASE_URL` empty (`""`) to use OpenAI's cloud API. For local providers, set the base URL to your local server's endpoint.
+
+2. **Index a directory**:
    ```bash
    filesift index /path/to/your/project
    ```
 
-2. **Search for files**:
+3. **Search for files**:
    ```bash
    filesift find "authentication logic"
    ```
 
-3. **Search in a specific directory**:
+4. **Search in a specific directory**:
    ```bash
    filesift find "data processing" --path /path/to/project
    ```

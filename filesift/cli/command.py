@@ -118,11 +118,70 @@ def find(query: str, path: Optional[Path]):
         raise click.Abort()
 
 
+def _validate_llm_config():
+    """Validate that required LLM configuration is set"""
+    from filesift._config.config import config_dict
+    
+    llm_config = config_dict.get("llm", {})
+    models_config = config_dict.get("models", {})
+    
+    llm_api_key = llm_config.get("LLM_API_KEY", "")
+    llm_base_url = llm_config.get("LLM_BASE_URL", "")
+    main_model = models_config.get("MAIN_MODEL", "")
+    
+    issues = []
+    
+    # Check API key
+    if not llm_api_key or llm_api_key == "placeholder_key":
+        issues.append("LLM_API_KEY is not set or is still the default placeholder")
+    
+    # Check main model
+    if not main_model:
+        issues.append("MAIN_MODEL is not set")
+    
+    # Check base URL format if provided (basic validation)
+    if llm_base_url and llm_base_url.strip():
+        if not (llm_base_url.startswith("http://") or llm_base_url.startswith("https://")):
+            issues.append("LLM_BASE_URL should start with http:// or https://")
+    
+    if issues:
+        click.echo("Error: LLM configuration is incomplete or invalid:", err=True)
+        click.echo("", err=True)
+        for issue in issues:
+            click.echo(f"  • {issue}", err=True)
+        click.echo("", err=True)
+        click.echo("Please configure your LLM settings using the 'config' subcommand:", err=True)
+        click.echo("", err=True)
+        click.echo("  For OpenAI (cloud):", err=True)
+        click.echo("    filesift config set llm.LLM_BASE_URL \"\"", err=True)
+        click.echo("    filesift config set llm.LLM_API_KEY \"sk-your-openai-api-key\"", err=True)
+        click.echo("    filesift config set models.MAIN_MODEL \"gpt-4o-mini\"", err=True)
+        click.echo("", err=True)
+        click.echo("  For LM Studio (local):", err=True)
+        click.echo("    filesift config set llm.LLM_BASE_URL \"http://localhost:1234/v1\"", err=True)
+        click.echo("    filesift config set llm.LLM_API_KEY \"lm-studio\"", err=True)
+        click.echo("    filesift config set models.MAIN_MODEL \"your-model-name\"", err=True)
+        click.echo("", err=True)
+        click.echo("  For Ollama (local):", err=True)
+        click.echo("    filesift config set llm.LLM_BASE_URL \"http://localhost:11434/v1\"", err=True)
+        click.echo("    filesift config set llm.LLM_API_KEY \"ollama\"", err=True)
+        click.echo("    filesift config set models.MAIN_MODEL \"llama3.2\"", err=True)
+        click.echo("", err=True)
+        click.echo("See 'filesift config list llm' and 'filesift config list models' for current values.", err=True)
+        return False
+    
+    return True
+
+
 @cli.command()
 @click.argument("path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option("--reindex", is_flag=True, help="Force a complete reindex, overwriting any existing index")
 def index(path: Path, reindex: bool):
     """Index a directory for search"""
+    # Validate LLM configuration before proceeding
+    if not _validate_llm_config():
+        raise click.Abort()
+    
     index_dir = path / ".filesift"
     
     try:
