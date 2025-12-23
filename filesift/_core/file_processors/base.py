@@ -50,12 +50,10 @@ class BaseFileProcessor(ABC):
         try:
             stat_info = file_path.stat()
             
-            # Get file name and extension
             file_name = file_path.name
             file_extension = file_path.suffix if file_path.suffix else "no extension"
             file_type = file_extension[1:] if file_extension.startswith('.') else file_extension
             
-            # Format file size
             size_bytes = stat_info.st_size
             if size_bytes < 1024:
                 size_str = f"{size_bytes} bytes"
@@ -64,14 +62,11 @@ class BaseFileProcessor(ABC):
             else:
                 size_str = f"{size_bytes / (1024 * 1024):.2f} MB"
             
-            # Format modification date
             mod_time = datetime.fromtimestamp(stat_info.st_mtime)
             mod_date_str = mod_time.strftime("%Y-%m-%d %H:%M:%S")
             
-            # Get absolute path
             abs_path = str(file_path.resolve())
             
-            # Format as LLM-friendly text
             info_lines = [
                 f"File: {file_name}",
                 f"Type: {file_type}",

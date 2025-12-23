@@ -9,7 +9,6 @@ import tiktoken
 from .base import BaseFileProcessor
 from filesift._config.config import config_dict
 
-# Optional dependencies
 try:
     import yaml
     yaml_available = True
@@ -31,7 +30,6 @@ class DataProcessor(BaseFileProcessor):
             ".json", ".yaml", ".yml", ".xml", ".csv", ".toml"
         }
         
-        # Initialize OpenAI client with config
         llm_api_key = config_dict["llm"]["LLM_API_KEY"]
         llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
         if llm_base_url and len(llm_base_url) > 0:
@@ -39,9 +37,8 @@ class DataProcessor(BaseFileProcessor):
         else:
             self.client = OpenAI(api_key=llm_api_key)
         
-        # Reserve tokens for prompt and response
         self.max_tokens_for_summary = max_tokens_for_summary
-        # Use cl100k_base encoding (used by GPT models)
+
         try:
             self.encoding = tiktoken.get_encoding("cl100k_base")
         except:
@@ -58,23 +55,18 @@ class DataProcessor(BaseFileProcessor):
     def _truncate_content_for_summary(self, content: str) -> str:
         """Truncate content to fit within token limit for LLM summarization"""
         if self.encoding is None:
-            # Fallback: rough estimate (1 token ≈ 4 characters)
             max_chars = self.max_tokens_for_summary * 4
             if len(content) <= max_chars:
                 return content
-            # Truncate and add indicator
             return content[:max_chars] + "\n\n[... content truncated for summary ...]"
         
-        # Count tokens in the content
         tokens = self.encoding.encode(content)
         if len(tokens) <= self.max_tokens_for_summary:
             return content
         
-        # Truncate to fit within token limit
         truncated_tokens = tokens[:self.max_tokens_for_summary]
         truncated_content = self.encoding.decode(truncated_tokens)
         
-        # Add truncation indicator
         return truncated_content + "\n\n[... content truncated for summary ...]"
     
     def _generate_llm_summary(self, file_path: Path, content: str, data_type: str) -> str:
@@ -101,7 +93,6 @@ class DataProcessor(BaseFileProcessor):
             )
             return response.choices[0].message.content
         except Exception as e:
-            # If LLM call fails, use a fallback summary
             self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
             return f"{data_type} data file: {file_path.name}\n{file_info}"
     
@@ -121,10 +112,8 @@ class DataProcessor(BaseFileProcessor):
             elif ext == ".toml":
                 content = self._process_toml(file_path)
             else:
-                # Fallback: read as text
                 content = file_path.read_text(encoding='utf-8', errors='ignore')
             
-            # Generate summary using LLM
             data_type = self._detect_data_type(file_path)
             if content:
                 summary = self._generate_llm_summary(file_path, content, data_type)
@@ -177,7 +166,6 @@ class DataProcessor(BaseFileProcessor):
             tree = ET.parse(file_path)
             root = tree.getroot()
             
-            # Get XML as string
             ET.indent(tree, space="  ")
             return ET.tostring(root, encoding='unicode')
         except ET.ParseError as e:
@@ -188,7 +176,6 @@ class DataProcessor(BaseFileProcessor):
         """Process CSV file and return JSON-formatted content"""
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                # Try to detect delimiter
                 sample = f.read(1024)
                 f.seek(0)
                 sniffer = csv.Sniffer()
@@ -197,8 +184,7 @@ class DataProcessor(BaseFileProcessor):
                 reader = csv.DictReader(f, delimiter=delimiter)
                 rows = list(reader)
                 
-                # Convert to JSON-like structure for content
-                content = json.dumps(rows[:100], indent=2)  # Limit to first 100 rows
+                content = json.dumps(rows[:100], indent=2)
                 if len(rows) > 100:
                     content += f"\n[... {len(rows) - 100} more rows ...]"
                 
@@ -213,7 +199,6 @@ class DataProcessor(BaseFileProcessor):
             raise ImportError("tomllib is required for TOML processing (Python 3.11+)")
         
         try:
-            # Read content as text for output
             return file_path.read_text(encoding='utf-8')
         except Exception as e:
             self.logger.warning(f"Invalid TOML in {file_path}: {str(e)}")
@@ -226,7 +211,7 @@ class DataProcessor(BaseFileProcessor):
         
         if isinstance(data, dict):
             items = []
-            for key, value in list(data.items())[:10]:  # Limit to 10 keys
+            for key, value in list(data.items())[:10]:
                 value_type = type(value).__name__
                 if isinstance(value, (dict, list)):
                     items.append(f"  {key}: {value_type} ({self._describe_json_structure(value, depth+1, max_depth)})")

@@ -10,12 +10,11 @@ from filesift._config.config import config_dict
 class IndexManager:
     """Manages multiple QueryDriver instances, one per directory"""
     def __init__(self):
-        self.drivers: Dict[str, QueryDriver] = {}  # path -> QueryDriver
+        self.drivers: Dict[str, QueryDriver] = {}
         self.logger = logging.getLogger(__name__)
     
     def get_driver(self, index_path: str) -> Optional[QueryDriver]:
         """Get or load QueryDriver for a given index path"""
-        # Normalize path to ensure consistent cache keys
         normalized_path = str(Path(index_path).resolve())
         
         if normalized_path not in self.drivers:
@@ -123,7 +122,6 @@ class DaemonHandler(BaseHTTPRequestHandler):
 
 class DaemonServer:
     def __init__(self):
-        # Load config
         daemon_config = config_dict.get("daemon", {})
         self.host = daemon_config.get("HOST", "127.0.0.1")
         self.port = daemon_config.get("PORT", 8687)
@@ -134,19 +132,17 @@ class DaemonServer:
         self.thread = None
         self.shutdown_timer: Optional[threading.Timer] = None
         self.logger = logging.getLogger(__name__)
-        self._lock = threading.Lock()  # Protect timer operations
+        self._lock = threading.Lock()
     
     def reset_inactivity_timer(self):
         """Reset the inactivity shutdown timer"""
         if self.inactivity_timeout <= 0:
-            return  # Auto-shutdown disabled
+            return
         
         with self._lock:
-            # Cancel existing timer if any
             if self.shutdown_timer:
                 self.shutdown_timer.cancel()
             
-            # Start new timer
             self.shutdown_timer = threading.Timer(
                 self.inactivity_timeout,
                 self._shutdown_after_inactivity
@@ -163,13 +159,11 @@ class DaemonServer:
     def start(self):
         """Start daemon in background thread"""
         self.server = HTTPServer((self.host, self.port), DaemonHandler)
-        # Set daemon_server global for handler access
         global daemon_server
         daemon_server = self
         
         def run_server():
             try:
-                # Start inactivity timer
                 if self.inactivity_timeout > 0:
                     self.reset_inactivity_timer()
                     self.logger.info(f"Daemon started on {self.host}:{self.port} (auto-shutdown after {self.inactivity_timeout}s inactivity)")

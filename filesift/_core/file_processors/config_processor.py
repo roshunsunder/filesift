@@ -18,7 +18,6 @@ class ConfigProcessor(BaseFileProcessor):
             ".env", ".env.local", ".env.production", ".env.development"
         }
         
-        # Initialize OpenAI client with config
         llm_api_key = config_dict["llm"]["LLM_API_KEY"]
         llm_base_url = config_dict["llm"]["LLM_BASE_URL"]
         if llm_base_url and len(llm_base_url) > 0:
@@ -26,19 +25,16 @@ class ConfigProcessor(BaseFileProcessor):
         else:
             self.client = OpenAI(api_key=llm_api_key)
         
-        # Reserve tokens for prompt and response
         self.max_tokens_for_summary = max_tokens_for_summary
-        # Use cl100k_base encoding (used by GPT models)
+
         try:
             self.encoding = tiktoken.get_encoding("cl100k_base")
         except:
             self.encoding = None
         
     def can_handle(self, file_path: Path) -> bool:
-        # Check extension
         if file_path.suffix.lower() in self.supported_extensions:
             return True
-        # Also check for .env files (which might not have extension)
         if file_path.name.startswith('.env'):
             return True
         return False
@@ -46,23 +42,18 @@ class ConfigProcessor(BaseFileProcessor):
     def _truncate_content_for_summary(self, content: str) -> str:
         """Truncate content to fit within token limit for LLM summarization"""
         if self.encoding is None:
-            # Fallback: rough estimate (1 token ≈ 4 characters)
             max_chars = self.max_tokens_for_summary * 4
             if len(content) <= max_chars:
                 return content
-            # Truncate and add indicator
             return content[:max_chars] + "\n\n[... content truncated for summary ...]"
         
-        # Count tokens in the content
         tokens = self.encoding.encode(content)
         if len(tokens) <= self.max_tokens_for_summary:
             return content
         
-        # Truncate to fit within token limit
         truncated_tokens = tokens[:self.max_tokens_for_summary]
         truncated_content = self.encoding.decode(truncated_tokens)
         
-        # Add truncation indicator
         return truncated_content + "\n\n[... content truncated for summary ...]"
     
     def _generate_llm_summary(self, file_path: Path, content: str, config_type: str) -> str:
@@ -89,7 +80,6 @@ class ConfigProcessor(BaseFileProcessor):
             )
             return response.choices[0].message.content
         except Exception as e:
-            # If LLM call fails, use a fallback summary
             self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
             return f"{config_type} configuration file: {file_path.name}\n{file_info}"
     
@@ -106,10 +96,8 @@ class ConfigProcessor(BaseFileProcessor):
             elif ext == ".env" or name.startswith(".env"):
                 content = self._process_env(file_path)
             else:
-                # Fallback: read as text
                 content = file_path.read_text(encoding='utf-8', errors='ignore')
             
-            # Generate summary using LLM
             config_type = self._detect_config_type(file_path)
             if content:
                 summary = self._generate_llm_summary(file_path, content, config_type)
@@ -137,7 +125,6 @@ class ConfigProcessor(BaseFileProcessor):
             config = configparser.ConfigParser()
             config.read(file_path, encoding='utf-8')
             
-            # Convert to JSON-like structure for content
             config_dict = {}
             for section in config.sections():
                 config_dict[section] = dict(config.items(section))

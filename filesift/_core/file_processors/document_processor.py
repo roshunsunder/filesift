@@ -23,15 +23,13 @@ class DocumentProcessor(BaseFileProcessor):
         else:
             self.client = OpenAI(api_key=llm_api_key)
         
-        # Reserve tokens for prompt and response
         self.max_tokens_for_summary = max_tokens_for_summary
-        # Use cl100k_base encoding (used by GPT models)
+
         try:
             self.encoding = tiktoken.get_encoding("cl100k_base")
         except:
             self.encoding = None
         
-        # Try to import optional dependencies
         self.pdf_available = False
         self.docx_available = False
         self.odt_available = False
@@ -71,23 +69,18 @@ class DocumentProcessor(BaseFileProcessor):
     def _truncate_content_for_summary(self, content: str) -> str:
         """Truncate content to fit within token limit for LLM summarization"""
         if self.encoding is None:
-            # Fallback: rough estimate (1 token ≈ 4 characters)
             max_chars = self.max_tokens_for_summary * 4
             if len(content) <= max_chars:
                 return content
-            # Truncate and add indicator
             return content[:max_chars] + "\n\n[... content truncated for summary ...]"
         
-        # Count tokens in the content
         tokens = self.encoding.encode(content)
         if len(tokens) <= self.max_tokens_for_summary:
             return content
         
-        # Truncate to fit within token limit
         truncated_tokens = tokens[:self.max_tokens_for_summary]
         truncated_content = self.encoding.decode(truncated_tokens)
         
-        # Add truncation indicator
         return truncated_content + "\n\n[... content truncated for summary ...]"
     
     def _generate_llm_summary(self, file_path: Path, content: str, doc_type: str) -> str:
@@ -114,7 +107,6 @@ class DocumentProcessor(BaseFileProcessor):
             )
             return response.choices[0].message.content
         except Exception as e:
-            # If LLM call fails, use a fallback summary
             self.logger.warning(f"LLM summarization failed for {file_path}: {str(e)}")
             return f"{doc_type} document: {file_path.name}\n{file_info}"
     
@@ -130,10 +122,8 @@ class DocumentProcessor(BaseFileProcessor):
             elif ext == ".odt":
                 content = self._process_odt(file_path)
             else:
-                # Fallback
                 content = ""
             
-            # Generate summary using LLM
             doc_type = self._detect_document_type(file_path)
             if content:
                 summary = self._generate_llm_summary(file_path, content, doc_type)
@@ -166,7 +156,7 @@ class DocumentProcessor(BaseFileProcessor):
                 pdf_reader = self.PyPDF2.PdfReader(f)
                 num_pages = len(pdf_reader.pages)
                 
-                for page_num, page in enumerate(pdf_reader.pages[:10]):  # Limit to first 10 pages
+                for page_num, page in enumerate(pdf_reader.pages[:10]):
                     text = page.extract_text()
                     if text.strip():
                         text_parts.append(f"--- Page {page_num + 1} ---\n{text}")
@@ -187,11 +177,9 @@ class DocumentProcessor(BaseFileProcessor):
         try:
             doc = self.DocxDocument(file_path)
             
-            # Extract text from paragraphs
             paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
             content = "\n".join(paragraphs)
             
-            # Extract tables
             table_texts = []
             for table in doc.tables:
                 table_rows = []
@@ -217,12 +205,11 @@ class DocumentProcessor(BaseFileProcessor):
         try:
             doc = self.odf.opendocument.load(file_path)
             
-            # Extract text from paragraphs
             paragraphs = []
             for para in doc.getElementsByType(self.odf.text.P):
                 text = ""
                 for node in para.childNodes:
-                    if node.nodeType == 3:  # Text node
+                    if node.nodeType == 3:
                         text += node.data
                 if text.strip():
                     paragraphs.append(text.strip())
