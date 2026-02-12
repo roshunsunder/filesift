@@ -26,11 +26,18 @@ def find(query: str, path: Optional[Path]):
         search_dir = Path.cwd()
     
     index_dir = search_dir / ".filesift"
-    
+
     if not index_dir.exists() or not any(index_dir.iterdir()):
+        # Check if a fast index exists before giving up
+        from filesift._core.fast_storage import FastIndexStore
+        if FastIndexStore.exists(index_dir):
+            click.echo("No semantic index found — falling back to fast search.", err=True)
+            _run_fast_search(query, search_dir)
+            return
         click.echo(f"Error: No index found in {search_dir}", err=True)
         click.echo(f"\nTo create an index, run:", err=True)
         click.echo(f"  filesift index {search_dir}", err=True)
+        click.echo(f"  filesift index-fast {search_dir}  (no LLM required)", err=True)
         raise click.Abort()
     
     from filesift.cli.daemon_utils import is_daemon_running, get_daemon_url, ensure_daemon_running
@@ -116,6 +123,41 @@ def find(query: str, path: Optional[Path]):
     except Exception as e:
         click.echo(f"Error during search: {e}", err=True)
         raise click.Abort()
+
+
+def _run_fast_search(query: str, search_dir: Path) -> None:
+    """Shared helper that runs a fast-index search and prints results."""
+    from filesift._core.fast_storage import FastIndexStore
+    from filesift._core.fast_searcher import FastSearcher
+    from filesift._config.config import config_dict
+
+    index_dir = search_dir / ".filesift"
+    fast_index = FastIndexStore.load(index_dir)
+    if fast_index is None:
+        click.echo("Error: Could not load fast index.", err=True)
+        raise click.Abort()
+
+    bm25 = FastIndexStore.load_bm25(index_dir)
+    searcher = FastSearcher(fast_index, bm25=bm25)
+
+    max_results = config_dict["search"]["MAX_RESULTS"]
+    results = searcher.search(query, max_results=max_results)
+
+    if not results:
+        click.echo("No results found.")
+        return
+
+    click.echo(f"\nFound {len(results)} result(s):\n")
+    for i, result in enumerate(results, 1):
+        click.echo(f"{i}. {result.file_path}")
+        parts = []
+        if result.metadata.get("language"):
+            parts.append(f"Language: {result.metadata['language']}")
+        parts.append(f"Match: {result.match_type}")
+        if result.matched_terms:
+            parts.append(f"Terms: {', '.join(result.matched_terms[:5])}")
+        click.echo(f"   {' | '.join(parts)}")
+        click.echo()
 
 
 def _validate_llm_config():
@@ -235,6 +277,61 @@ def index(path: Path, reindex: bool):
     except Exception as e:
         click.echo(f"Error during indexing: {e}", err=True)
         raise click.Abort()
+
+
+@cli.command("index-fast")
+@click.argument("path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.option("--reindex", is_flag=True, help="Force a complete reindex, ignoring existing fast index")
+def index_fast(path: Path, reindex: bool):
+    """Build fast index (no LLM required)"""
+    from filesift._core.fast_indexer import FastIndexer
+    from filesift._core.fast_storage import FastIndexStore
+
+    index_dir = path / ".filesift"
+
+    try:
+        indexer = FastIndexer(root=path)
+
+        existing = None
+        if not reindex and FastIndexStore.exists(index_dir):
+            existing = FastIndexStore.load(index_dir)
+            if existing:
+                click.echo("Existing fast index found, checking for changes...")
+
+        if existing and not reindex:
+            fast_index = indexer.incremental_index(existing)
+        else:
+            if reindex:
+                click.echo("Reindexing: creating fresh fast index...")
+            fast_index = indexer.index()
+
+        FastIndexStore.save(fast_index, index_dir)
+
+        file_count = len(fast_index.files)
+        click.echo(f"Fast index saved ({file_count} files indexed).")
+
+    except Exception as e:
+        click.echo(f"Error during fast indexing: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command("find-fast")
+@click.argument("query", required=True)
+@click.option("--path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+              help="Directory to search in (defaults to current directory)")
+def find_fast(query: str, path: Optional[Path]):
+    """Search using fast index (instant results, no LLM required)"""
+    search_dir = Path(path) if path else Path.cwd()
+    index_dir = search_dir / ".filesift"
+
+    from filesift._core.fast_storage import FastIndexStore
+    if not FastIndexStore.exists(index_dir):
+        click.echo(f"Error: No fast index found in {search_dir}", err=True)
+        click.echo(f"\nTo create a fast index, run:", err=True)
+        click.echo(f"  filesift index-fast {search_dir}", err=True)
+        raise click.Abort()
+
+    _run_fast_search(query, search_dir)
 
 
 @cli.group()
