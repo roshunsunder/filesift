@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "filesift"
-version = "0.1.0"
+version = "0.2.0"
 description = "Intelligent file indexing and search system"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,7 +24,6 @@ keywords = [
     "code-search",
     "document-search",
     "faiss",
-    "llm",
     "embeddings",
     "natural-language-search"
 ]
@@ -43,22 +42,16 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/roshunsunder/filesift"}
 dependencies = [
-    "langchain-community",
-    "langchain_huggingface",
     "faiss-cpu",
     "sentence-transformers",
-    "openai",
-    "python-dotenv",
-    "tiktoken",
     "rank-bm25",
+    "numpy",
+    "requests",
     "click",
     "tqdm",
     "platformdirs",
     "tomli-w",
-    "PyPDF2",
-    "python-docx",
-    "odfpy",
-    "PyYAML"
+    "PyYAML",
 ]
 
 [project.optional-dependencies]

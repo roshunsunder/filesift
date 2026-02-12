@@ -1,41 +1,10 @@
-# Default configuration file for FileSift
-# These values can be overridden by environment variables
-
-# Path settings
-[paths]
-
-# Index directory name (stored within .filesift directory)
-INDEX_DIR_NAME = "faiss_index"
+# Default configuration file for FileSift v0.2.0
+# These values can be overridden via `filesift config set`
 
 # Model settings
 [models]
-# Embedding model for semantic search
-EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
-
-# Image processing model
-IMAGE_MODEL = ""
-
-# Main model for general text-related tasks
-MAIN_MODEL = "gpt-4.1"
-
-# LLM settings
-[llm]
-# Base URL for OpenAI API
-LLM_BASE_URL = ""
-
-# API key for LLM
-LLM_API_KEY = "placeholder_key"
-
-# API Keys
-[api_keys]
-# OpenAI API key (for external OpenAI API usage)
-OPENAI_API_KEY = ""
-
-# Hugging Face bearer token (for Hugging Face API usage)
-HF_BEARER_TOKEN = ""
-
-# Server settings
-[server]
+# Embedding model for semantic search ("nomic" is the default local model)
+EMBEDDING_MODEL = "nomic"
 
 # Search settings
 [search]
@@ -43,16 +12,11 @@ HF_BEARER_TOKEN = ""
 MAX_RESULTS = 10
 
 # Similarity threshold for filtering results (0.0 to 1.0)
-SIMILARITY_THRESHOLD = 0.7
+# Code embeddings score lower than summary embeddings, so 0.3 is a good default
+SIMILARITY_THRESHOLD = 0.3
 
 # Indexing settings
 [indexing]
-# Chunk size for text splitting
-CHUNK_SIZE = 1000
-
-# Overlap between chunks
-CHUNK_OVERLAP = 200
-
 # Directories to exclude from indexing
 EXCLUDED_DIRS = [
     ".git",
@@ -76,5 +40,4 @@ PORT = 8687
 
 # Inactivity timeout in seconds (daemon will auto-terminate after this period)
 # Set to 0 to disable auto-shutdown
-INACTIVITY_TIMEOUT = 300  # 5 minutes default
-
+INACTIVITY_TIMEOUT = 300
