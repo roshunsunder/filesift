@@ -64,7 +64,7 @@ class SemanticSearcher:
             entry = self._entries[rel]
             results.append(
                 SemanticSearchResult(
-                    file_path=entry.file_path,
+                    file_path=entry.relative_path,
                     relative_path=entry.relative_path,
                     score=score,
                     language=entry.language,

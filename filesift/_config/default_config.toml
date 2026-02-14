@@ -9,7 +9,7 @@ EMBEDDING_MODEL = "nomic"
 # Search settings
 [search]
 # Maximum number of results to return
-MAX_RESULTS = 10
+MAX_RESULTS = 5
 
 # Similarity threshold for filtering results (0.0 to 1.0)
 # Code embeddings score lower than summary embeddings, so 0.3 is a good default
