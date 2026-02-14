@@ -104,7 +104,9 @@ class SemanticIndexer:
     # ------------------------------------------------------------------
 
     def index(
-        self, existing_entries: Optional[Dict[str, SemanticEntry]] = None
+        self,
+        existing_entries: Optional[Dict[str, SemanticEntry]] = None,
+        progress_callback: Optional[callable] = None,
     ) -> Tuple[faiss.IndexFlatIP, Dict[str, SemanticEntry], SemanticIndexStats]:
         """Scan files, embed, and build a FAISS index.
 
@@ -112,6 +114,7 @@ class SemanticIndexer:
             existing_entries: Previous entries keyed by relative_path.
                 Files whose content hash matches are loaded from cache
                 instead of re-embedded.
+            progress_callback: Optional function (status_dict) -> None to report progress.
 
         Returns:
             (faiss_index, entries_dict, stats)
@@ -148,6 +151,7 @@ class SemanticIndexer:
             unit="file",
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
             leave=False,
+            disable=bool(progress_callback),
         )
 
         for fp in files_to_consider:
@@ -186,6 +190,13 @@ class SemanticIndexer:
                     order.append(rel)
                     stats.cached_files += 1
                     pbar.update(1)
+                    if progress_callback:
+                        progress_callback({
+                            "phase": "scanning",
+                            "total": len(files_to_consider),
+                            "current": pbar.n,
+                            "percent": (pbar.n / len(files_to_consider)) * 100
+                        })
                     continue
 
             # Queue for batch embedding
@@ -193,6 +204,13 @@ class SemanticIndexer:
             to_embed_paths.append(fp)
             to_embed_contents.append(content)
             pbar.update(1)
+            if progress_callback:
+                progress_callback({
+                    "phase": "scanning",
+                    "total": len(files_to_consider),
+                    "current": pbar.n,
+                    "percent": (pbar.n / len(files_to_consider)) * 100
+                })
 
         pbar.close()
 
@@ -204,10 +222,19 @@ class SemanticIndexer:
             embed_pbar = tqdm(
                 total=len(to_embed_contents),
                 desc="Generating embeddings",
-                unit="file",
+                unit="chunk",
                 bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
                 leave=False,
+                disable=bool(progress_callback),
             )
+
+            if progress_callback:
+                progress_callback({
+                    "phase": "embedding",
+                    "total": len(to_embed_contents),
+                    "current": 0,
+                    "percent": 0.0
+                })
 
             for batch_start in range(0, len(to_embed_contents), self.BATCH_SIZE):
                 batch_end = min(batch_start + self.BATCH_SIZE, len(to_embed_contents))
@@ -244,6 +271,13 @@ class SemanticIndexer:
                     stats.new_files += 1
                 
                 embed_pbar.update(len(batch_texts))
+                if progress_callback:
+                    progress_callback({
+                        "phase": "embedding",
+                        "total": len(to_embed_contents),
+                        "current": embed_pbar.n,
+                        "percent": (embed_pbar.n / len(to_embed_contents)) * 100
+                    })
             
             embed_pbar.close()
         elif stats.cached_files:
@@ -312,3 +346,35 @@ class SemanticIndexer:
         return (directory / SEMANTIC_INDEX_FILE).exists() and (
             directory / SEMANTIC_META_FILE
         ).exists()
+
+    def is_index_stale(self, directory: Path) -> bool:
+        """Check if the index is stale by comparing file mtimes with index build time."""
+        directory = Path(directory)
+        if not self.exists(directory):
+            return True
+
+        # Load metadata to find build time
+        meta_path = directory / SEMANTIC_META_FILE
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+            # Find the latest 'indexed_at' timestamp
+            if not meta.get("entries"):
+                return True # Empty index is effectively stale if files exist
+            
+            # This is a heuristic: check if any file in root is newer than the index file
+            # or newer than the latest entry.
+            # Using index file mtime is a good proxy for "last build time".
+            index_mtime = meta_path.stat().st_mtime
+            
+            # Check a sample of files or all files for freshness
+            # For speed, we can check recent mtimes in a quick scan
+            for fp in self.root.rglob("*"):
+                if fp.is_file() and self._should_index(fp):
+                    if fp.stat().st_mtime > index_mtime:
+                        return True
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Failed to check staleness: {e}")
+            return True

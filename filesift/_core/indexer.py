@@ -17,7 +17,7 @@ class Indexer:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
 
-    def index(self, reindex: bool = False) -> None:
+    def index(self, reindex: bool = False, semantic: bool = True) -> None:
         index_dir = self.root / ".filesift"
 
         # --- Fast tier ---
@@ -35,17 +35,18 @@ class Indexer:
         print(f"Fast index saved ({len(fast_index.files)} files)")
 
         # --- Semantic tier ---
-        embedding_model = create_embedding_model()
-        cache_dir = index_dir / SEMANTIC_CACHE_DIR
+        if semantic:
+            embedding_model = create_embedding_model()
+            cache_dir = index_dir / SEMANTIC_CACHE_DIR
 
-        semantic_indexer = SemanticIndexer(self.root, embedding_model, cache_dir)
+            semantic_indexer = SemanticIndexer(self.root, embedding_model, cache_dir)
 
-        existing_entries = None
-        if not reindex and SemanticIndexer.exists(index_dir):
-            loaded = SemanticIndexer.load(index_dir)
-            if loaded:
-                _, existing_entries = loaded
+            existing_entries = None
+            if not reindex and SemanticIndexer.exists(index_dir):
+                loaded = SemanticIndexer.load(index_dir)
+                if loaded:
+                    _, existing_entries = loaded
 
-        faiss_index, entries, stats = semantic_indexer.index(existing_entries)
-        SemanticIndexer.save(faiss_index, entries, index_dir)
-        print(f"Semantic index saved ({stats.total_files} files, {stats.new_files} embedded, {stats.cached_files} cached)")
+            faiss_index, entries, stats = semantic_indexer.index(existing_entries)
+            SemanticIndexer.save(faiss_index, entries, index_dir)
+            print(f"Semantic index saved ({stats.total_files} files, {stats.new_files} embedded, {stats.cached_files} cached)")

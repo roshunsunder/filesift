@@ -5,6 +5,9 @@ import logging
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from filesift._core.query import QueryDriver
+from filesift._core.indexer import Indexer, SEMANTIC_CACHE_DIR
+from filesift._core.embeddings import create_embedding_model
+from filesift._core.semantic_indexer import SemanticIndexer
 from filesift._config.config import config_dict
 
 class IndexManager:
@@ -12,6 +15,8 @@ class IndexManager:
     def __init__(self):
         self.drivers: Dict[str, QueryDriver] = {}
         self.loading_paths: Dict[str, threading.Thread] = {}
+        self.indexing_paths: Dict[str, threading.Thread] = {}
+        self.indexing_status: Dict[str, Dict[str, Any]] = {}
         self.logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
     
@@ -84,12 +89,100 @@ class IndexManager:
             # in self.drivers if the user actually wanted it gone. 
             # (In reality, unload usually means 'I don't need this anymore')
 
+            # In reality, unload usually means 'I don't need this anymore')
+    
+    def trigger_semantic_index(self, index_path: str) -> bool:
+        """Trigger background semantic indexing"""
+        normalized_path = str(Path(index_path).resolve())
+        
+        with self._lock:
+            if normalized_path in self.indexing_paths:
+                self.logger.info(f"Indexing already in progress for: {normalized_path}")
+                return True
+            
+            self.indexing_status[normalized_path] = {"phase": "starting", "percent": 0}
+            
+            thread = threading.Thread(
+                target=self._bg_index,
+                args=(normalized_path,),
+                daemon=True
+            )
+            self.indexing_paths[normalized_path] = thread
+            thread.start()
+            return True
+
+    def _bg_index(self, path: str):
+        """Background worker to run semantic indexing"""
+        self.logger.info(f"Starting background indexing for: {path}")
+        try:
+            root = Path(path)
+            index_dir = root / ".filesift"
+            
+            # Setup callback
+            def progress_callback(status):
+                with self._lock:
+                    self.indexing_status[path] = status
+            
+            # Run semantic indexing
+            # We partially replicate Indexer logic here to use the callback
+            embedding_model = create_embedding_model()
+            cache_dir = index_dir / SEMANTIC_CACHE_DIR
+            
+            indexer = SemanticIndexer(root, embedding_model, cache_dir)
+            
+            existing_entries = None
+            if SemanticIndexer.exists(index_dir):
+                loaded = SemanticIndexer.load(index_dir)
+                if loaded:
+                    _, existing_entries = loaded
+            
+            faiss_index, entries, stats = indexer.index(
+                existing_entries, 
+                progress_callback=progress_callback
+            )
+            
+            with self._lock:
+                self.indexing_status[path] = {"phase": "saving", "percent": 100}
+                
+            SemanticIndexer.save(faiss_index, entries, index_dir)
+            self.logger.info(f"Background indexing complete for {path}")
+            
+            # Auto-reload the index driver if it exists
+            self.reload_index(path)
+            
+        except Exception as e:
+            self.logger.error(f"Background indexing failed for {path}: {e}")
+            with self._lock:
+                self.indexing_status[path] = {"phase": "error", "error": str(e)}
+        finally:
+            with self._lock:
+                if path in self.indexing_paths:
+                    del self.indexing_paths[path]
+                # We optionally keep the status around for a bit, or clear it
+                # For now, let's keep "completed" status or clear it if successful?
+                # Let's clear it from 'indexing_paths' implies it's done. 
+                # But 'indexing_status' might be useful to show "Done".
+                # We'll leave it in indexing_status but maybe mark as done.
+                if path in self.indexing_status and "error" not in self.indexing_status[path]:
+                     self.indexing_status[path] = {"phase": "complete", "percent": 100}
+
     def get_status(self) -> Dict[str, Any]:
         """Get status of managed indexes"""
         with self._lock:
+            # Check staleness for loaded drivers
+            stale_status = {}
+            for path, driver in self.drivers.items():
+                # We can't easily check staleness without checking files.
+                # Let's instantiate a lightweight SemanticIndexer to check.
+                # Or just assume not stale for now unless we want to do IO here.
+                # Better: cache the staleness check?
+                # For now, let's just properly report what is known.
+                pass
+
             return {
                 "loaded": list(self.drivers.keys()),
-                "loading": list(self.loading_paths.keys())
+                "loading": list(self.loading_paths.keys()),
+                "indexing": self.indexing_status
             }
 
 class DaemonHandler(BaseHTTPRequestHandler):
@@ -100,6 +193,8 @@ class DaemonHandler(BaseHTTPRequestHandler):
             self.handle_search()
         elif self.path == '/reload':
             self.handle_reload()
+        elif self.path == '/index':
+            self.handle_index()
         else:
             self.send_error(404)
     
@@ -166,6 +261,25 @@ class DaemonHandler(BaseHTTPRequestHandler):
         daemon_server.reset_inactivity_timer()
         status = daemon_server.index_manager.get_status()
         self.send_json_response(200, status)
+
+    def handle_index(self):
+        """Trigger semantic indexing"""
+        daemon_server.reset_inactivity_timer()
+        
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        data = json.loads(post_data.decode('utf-8'))
+        
+        index_path = data.get('index_path')
+        if not index_path:
+            self.send_error(400, "Missing index_path")
+            return
+            
+        daemon_server.index_manager.trigger_semantic_index(index_path)
+        self.send_json_response(202, {
+            "status": "accepted",
+            "message": "Background indexing started"
+        })
     
     def handle_health(self):
         """Health check - resets inactivity timer"""

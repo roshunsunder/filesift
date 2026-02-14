@@ -103,44 +103,46 @@ def _print_results(results) -> None:
 
 @cli.command()
 @click.argument("path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-@click.option("--reindex", is_flag=True, help="Force a complete reindex, overwriting any existing index")
-def index(path: Path, reindex: bool):
-    """Index a directory for search"""
-    try:
-        from filesift._core.indexer import Indexer
-    except ImportError:
-        click.echo("Couldn't load indexer.", err=True)
-        raise click.Abort()
 
-    try:
-        indexer = Indexer(root=path)
-        indexer.index(reindex=reindex)
-        click.echo("Indexing complete.")
+@click.option("--reindex", is_flag=True, help="Force full re-indexing")
+@click.option("--no-semantic", is_flag=True, help="Skip semantic indexing (background task)")
+def index(path: Path, reindex: bool, no_semantic: bool):
+    """Index a directory (Fast Index + Background Semantic)"""
+    from filesift._core.indexer import Indexer
+    from filesift.cli.daemon_utils import ensure_daemon_running, get_daemon_url
+    import requests
+    
+    root = Path(path).resolve()
+    click.echo(f"Indexing {root}...")
+    
+    # 1. Run Fast Indexing (Synchronous)
+    indexer = Indexer(root)
+    indexer.index(reindex=reindex, semantic=False)
+    click.echo("Fast index built. You can now use 'filesift find'.")
 
-        from filesift.cli.daemon_utils import ensure_daemon_running, get_daemon_url
-        import requests
+    if no_semantic:
+        return
 
-        index_dir = path / ".filesift"
-        if ensure_daemon_running():
-            try:
-                url = get_daemon_url()
-                click.echo("Notifying daemon to reload index...")
-                response = requests.post(
-                    f"{url}/reload",
-                    json={"index_path": str(index_dir)},
-                    timeout=10
-                )
-                if response.status_code == 202:
-                    click.echo("Daemon is reloading the index in the background.")
-                    click.echo("Run 'filesift daemon status' to check progress.")
-                else:
-                    response.raise_for_status()
-            except Exception as e:
-                click.echo(f"Warning: Could not reload index in daemon: {e}", err=True)
+    # 2. Trigger Background Semantic Indexing
+    if ensure_daemon_running():
+        try:
+            url = get_daemon_url()
+            click.echo("Triggering background semantic indexing...")
+            response = requests.post(
+                f"{url}/index",
+                json={"index_path": str(root)},
+                timeout=5
+            )
+            if response.status_code == 202:
+                click.echo("Semantic indexing started in background.")
+                click.echo("Run 'filesift daemon status' to check progress.")
+            else:
+                click.echo(f"Warning: Daemon returned {response.status_code}: {response.text}", err=True)
+        except Exception as e:
+            click.echo(f"Warning: Could not trigger daemon: {e}", err=True)
+            click.echo("You can run 'filesift index --reindex' later to retry.")
 
-    except Exception as e:
-        click.echo(f"Error during indexing: {e}", err=True)
-        raise click.Abort()
+
 
 
 @cli.group()
@@ -500,19 +502,57 @@ def status():
                 status_data = status_resp.json()
                 loaded = status_data.get("loaded", [])
                 loading = status_data.get("loading", [])
+                indexing = status_data.get("indexing", {})
                 
                 if loaded:
                     click.echo(f"  Loaded Indexes ({len(loaded)}):")
                     for p in loaded:
-                        click.echo(f"    - {p}")
-                
+                        stale_msg = ""
+                        # Check staleness - assuming local access for now
+                        try:
+                            from pathlib import Path
+                            import json
+                            
+                            idx_path = Path(p) / ".filesift" / "semantic_index.json"
+                            if idx_path.exists():
+                                idx_mtime = idx_path.stat().st_mtime
+                                # Check for newer files (excluding hidden/virtual envs coarsely)
+                                # A full scan might be slow, so we'll do a quick check
+                                root = Path(p)
+                                for fp in root.rglob("*"):
+                                    if fp.is_file() and not fp.name.startswith("."):
+                                        # Skip common ignore dirs if possible, but for now simple rglob
+                                        if "venv" in str(fp) or "__pycache__" in str(fp):
+                                            continue
+                                        if fp.stat().st_mtime > idx_mtime:
+                                            stale_msg = " [!] Files changed since indexing"
+                                            break
+                        except Exception:
+                            pass
+                            
+                        click.echo(f"    - {p}{stale_msg}")
+
                 if loading:
                     click.echo(f"  Loading in Background ({len(loading)}):")
                     for p in loading:
                         click.echo(f"    - {p}")
-                elif not loaded:
-                    click.echo("  No indexes loaded.")
-        except Exception:
+                
+                if indexing:
+                    click.echo(f"  Building Semantic Index ({len(indexing)}):")
+                    for p, info in indexing.items():
+                        phase = info.get("phase", "unknown")
+                        percent = info.get("percent", 0)
+                        if phase == "complete":
+                             click.echo(f"    - {p}: Fully indexed")
+                        elif phase == "error":
+                             click.echo(f"    - {p}: Error: {info.get('error')}")
+                        else:
+                             click.echo(f"    - {p}: {phase} ({percent:.1f}%)")
+
+                if not loaded and not loading and not indexing:
+                    click.echo("  No indexes active.")
+        except Exception as e:
+            # click.echo(f"Error fetching status: {e}") 
             pass
 
         if timeout > 0:

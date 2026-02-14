@@ -33,6 +33,8 @@ class QueryDriver:
 
     def load_from_disk(self, path: str) -> None:
         path_obj = Path(path)
+        if (path_obj / ".filesift").is_dir():
+             path_obj = path_obj / ".filesift"
 
         # Fast tier
         try:
