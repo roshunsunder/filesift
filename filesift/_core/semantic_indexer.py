@@ -144,7 +144,7 @@ class SemanticIndexer:
 
         pbar = tqdm(
             total=len(files_to_consider),
-            desc="Semantic indexing",
+            desc="Scanning files",
             unit="file",
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
             leave=False,
@@ -201,6 +201,14 @@ class SemanticIndexer:
             print(f"Embedding {len(to_embed_contents)} file(s) ({stats.cached_files} cached)...")
             now = datetime.now().isoformat()
 
+            embed_pbar = tqdm(
+                total=len(to_embed_contents),
+                desc="Generating embeddings",
+                unit="file",
+                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                leave=False,
+            )
+
             for batch_start in range(0, len(to_embed_contents), self.BATCH_SIZE):
                 batch_end = min(batch_start + self.BATCH_SIZE, len(to_embed_contents))
                 batch_texts = to_embed_contents[batch_start:batch_end]
@@ -234,6 +242,10 @@ class SemanticIndexer:
                     vectors.append(vec)
                     order.append(rel)
                     stats.new_files += 1
+                
+                embed_pbar.update(len(batch_texts))
+            
+            embed_pbar.close()
         elif stats.cached_files:
             print(f"All {stats.cached_files} file(s) loaded from cache")
 

@@ -18,10 +18,15 @@ class NomicEmbedModel(EmbeddingModel):
     QUERY_PREFIX = "search_query: "
 
     def __init__(self):
+        import torch
         from sentence_transformers import SentenceTransformer
 
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
         self._model = SentenceTransformer(
-            "nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True
+            "nomic-ai/nomic-embed-text-v1.5", 
+            trust_remote_code=True,
+            device=device
         )
 
     def embed(self, text: str) -> np.ndarray:
@@ -49,4 +54,4 @@ class NomicEmbedModel(EmbeddingModel):
 
     @property
     def max_tokens(self) -> int:
-        return 8192
+        return 2048
