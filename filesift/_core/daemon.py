@@ -20,9 +20,15 @@ class IndexManager:
         self.logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
     
+    def _normalize_path(self, index_path: str) -> str:
+        path = Path(index_path).resolve()
+        if path.name == ".filesift":
+            path = path.parent
+        return str(path)
+
     def get_driver(self, index_path: str) -> Optional[QueryDriver]:
         """Get or load QueryDriver for a given index path (blocking)"""
-        normalized_path = str(Path(index_path).resolve())
+        normalized_path = self._normalize_path(index_path)
         
         with self._lock:
             if normalized_path in self.drivers:
@@ -47,7 +53,7 @@ class IndexManager:
     
     def reload_index(self, index_path: str) -> bool:
         """Trigger a reload of an index in the background"""
-        normalized_path = str(Path(index_path).resolve())
+        normalized_path = self._normalize_path(index_path)
         
         with self._lock:
             if normalized_path in self.loading_paths:
@@ -81,7 +87,7 @@ class IndexManager:
     
     def unload_index(self, index_path: str):
         """Unload an index to free memory"""
-        normalized_path = str(Path(index_path).resolve())
+        normalized_path = self._normalize_path(index_path)
         with self._lock:
             if normalized_path in self.drivers:
                 del self.drivers[normalized_path]
@@ -93,7 +99,7 @@ class IndexManager:
     
     def trigger_semantic_index(self, index_path: str) -> bool:
         """Trigger background semantic indexing"""
-        normalized_path = str(Path(index_path).resolve())
+        normalized_path = self._normalize_path(index_path)
         
         with self._lock:
             if normalized_path in self.indexing_paths:

@@ -58,6 +58,10 @@ class SemanticIndexer:
     # ------------------------------------------------------------------
 
     def _should_index(self, file_path: Path) -> bool:
+        # Always exclude .filesift directories (including nested ones)
+        if ".filesift" in str(file_path):
+            return False
+
         if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             return False
         for excluded in self.excluded_dirs:

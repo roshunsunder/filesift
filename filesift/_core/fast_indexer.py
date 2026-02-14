@@ -37,6 +37,10 @@ class FastIndexer:
 
     def _should_index(self, file_path: Path) -> bool:
         """Return True if the file extension is supported and it isn't in an excluded dir."""
+        # Always exclude .filesift directories (including nested ones)
+        if ".filesift" in str(file_path):
+            return False
+            
         if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             return False
         for excluded in self.excluded_dirs:

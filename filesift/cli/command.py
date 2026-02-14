@@ -522,7 +522,7 @@ def status():
                                 for fp in root.rglob("*"):
                                     if fp.is_file() and not fp.name.startswith("."):
                                         # Skip common ignore dirs if possible, but for now simple rglob
-                                        if "venv" in str(fp) or "__pycache__" in str(fp):
+                                        if "venv" in str(fp) or "__pycache__" in str(fp) or ".filesift" in str(fp):
                                             continue
                                         if fp.stat().st_mtime > idx_mtime:
                                             stale_msg = " [!] Files changed since indexing"
