@@ -191,6 +191,11 @@ class IndexManager:
                 "indexing": self.indexing_status
             }
 
+    def is_busy(self) -> bool:
+        """Check if any background tasks are running"""
+        with self._lock:
+             return bool(self.loading_paths) or bool(self.indexing_paths)
+
 class DaemonHandler(BaseHTTPRequestHandler):
     """HTTP request handler for daemon"""
     
@@ -336,6 +341,11 @@ class DaemonServer:
     
     def _shutdown_after_inactivity(self):
         """Shutdown daemon after inactivity period"""
+        if self.index_manager.is_busy():
+             self.logger.info("Inactivity timeout reached, but daemon is busy. Resetting timer.")
+             self.reset_inactivity_timer()
+             return
+
         self.logger.info(f"Daemon shutting down after {self.inactivity_timeout}s of inactivity")
         self.stop()
     
