@@ -27,20 +27,42 @@ def is_daemon_running() -> bool:
         return False
 
 def get_daemon_pid() -> Optional[int]:
-    """Get the PID of the running daemon from PID file"""
-    if not DAEMON_PID_FILE.exists():
-        return None
-    try:
-        with open(DAEMON_PID_FILE, 'r') as f:
-            pid = int(f.read().strip())
+    """Get the PID of the running daemon from PID file or lsof fallback"""
+    # 1. Try PID file first
+    if DAEMON_PID_FILE.exists():
         try:
-            os.kill(pid, 0)
-            return pid
-        except OSError:
-            DAEMON_PID_FILE.unlink()
-            return None
-    except (ValueError, IOError):
-        return None
+            with open(DAEMON_PID_FILE, 'r') as f:
+                pid = int(f.read().strip())
+            try:
+                os.kill(pid, 0)
+                return pid
+            except OSError:
+                DAEMON_PID_FILE.unlink()
+                # Fallthrough to lsof check
+        except (ValueError, IOError):
+            pass
+
+    # 2. Fallback: Check who is listening on the port
+    try:
+        daemon_config = config_dict.get("daemon", {})
+        port = daemon_config.get("PORT", 8687)
+        # Use lsof to find the PID listening on the port
+        result = subprocess.run(
+            ["lsof", "-t", f"-i:{port}"], 
+            capture_output=True, 
+            text=True
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            pids = result.stdout.strip().split('\n')
+            if pids:
+                pid = int(pids[0])
+                # If we found it via lsof but file was missing/stale, update the file
+                save_daemon_pid(pid)
+                return pid
+    except Exception:
+        pass
+        
+    return None
 
 def save_daemon_pid(pid: int):
     """Save daemon PID to file"""
