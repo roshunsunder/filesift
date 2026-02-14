@@ -137,29 +137,6 @@ def index(path: Path, reindex: bool):
         raise click.Abort()
 
 
-# Deprecated aliases — hidden but functional
-@cli.command("index-fast", hidden=True)
-@click.argument("path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-@click.option("--reindex", is_flag=True)
-def index_fast(path: Path, reindex: bool):
-    """[Deprecated] Use 'filesift index' instead — it now includes fast indexing."""
-    click.echo("Warning: 'index-fast' is deprecated. Use 'filesift index' instead.", err=True)
-    click.echo("Running unified index...\n", err=True)
-    ctx = click.get_current_context()
-    ctx.invoke(index, path=path, reindex=reindex)
-
-
-@cli.command("find-fast", hidden=True)
-@click.argument("query", required=True)
-@click.option("--path", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-def find_fast(query: str, path: Optional[Path]):
-    """[Deprecated] Use 'filesift find' instead — it now searches both tiers."""
-    click.echo("Warning: 'find-fast' is deprecated. Use 'filesift find' instead.", err=True)
-    click.echo("Running unified search...\n", err=True)
-    ctx = click.get_current_context()
-    ctx.invoke(find, query=query, path=path)
-
-
 @cli.group()
 def config():
     """Manage configuration settings"""
