@@ -8,6 +8,9 @@ import sys
 from filesift._core.daemon import DaemonServer
 
 if __name__ == "__main__":
+    from filesift.cli.daemon_utils import save_daemon_pid
+    save_daemon_pid(os.getpid())
+    
     daemon = DaemonServer()
     daemon.start()
     

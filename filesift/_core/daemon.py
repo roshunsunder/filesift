@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 import json
 import logging
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from filesift._core.query import QueryDriver
 from filesift._config.config import config_dict
 
@@ -11,34 +11,86 @@ class IndexManager:
     """Manages multiple QueryDriver instances, one per directory"""
     def __init__(self):
         self.drivers: Dict[str, QueryDriver] = {}
+        self.loading_paths: Dict[str, threading.Thread] = {}
         self.logger = logging.getLogger(__name__)
+        self._lock = threading.Lock()
     
     def get_driver(self, index_path: str) -> Optional[QueryDriver]:
-        """Get or load QueryDriver for a given index path"""
+        """Get or load QueryDriver for a given index path (blocking)"""
         normalized_path = str(Path(index_path).resolve())
         
-        if normalized_path not in self.drivers:
+        with self._lock:
+            if normalized_path in self.drivers:
+                return self.drivers[normalized_path]
+            
+            # If it's already loading in background, we might want to wait or return None
+            # For simplicity, we'll just return None here if it's already loading
+            if normalized_path in self.loading_paths:
+                self.logger.info(f"Index is currently loading in background: {normalized_path}")
+                return None
+
             try:
+                # Synchronous load for immediate search needs if not already loading
                 driver = QueryDriver()
                 driver.load_from_disk(normalized_path)
                 self.drivers[normalized_path] = driver
                 self.logger.info(f"Loaded index: {normalized_path}")
+                return driver
             except Exception as e:
                 self.logger.error(f"Failed to load index {normalized_path}: {e}")
                 return None
-        return self.drivers[normalized_path]
     
-    def reload_index(self, index_path: str):
-        """Reload an index (e.g., after reindexing)"""
+    def reload_index(self, index_path: str) -> bool:
+        """Trigger a reload of an index in the background"""
         normalized_path = str(Path(index_path).resolve())
-        if normalized_path in self.drivers:
-            del self.drivers[normalized_path]
-        return self.get_driver(index_path)
+        
+        with self._lock:
+            if normalized_path in self.loading_paths:
+                self.logger.info(f"Reload already in progress for: {normalized_path}")
+                return True
+            
+            thread = threading.Thread(
+                target=self._bg_load,
+                args=(normalized_path,),
+                daemon=True
+            )
+            self.loading_paths[normalized_path] = thread
+            thread.start()
+            return True
+
+    def _bg_load(self, path: str):
+        """Background worker to load an index"""
+        self.logger.info(f"Starting background load for: {path}")
+        try:
+            driver = QueryDriver()
+            driver.load_from_disk(path)
+            with self._lock:
+                self.drivers[path] = driver
+                self.logger.info(f"Background load complete: {path}")
+        except Exception as e:
+            self.logger.error(f"Background load failed for {path}: {e}")
+        finally:
+            with self._lock:
+                if path in self.loading_paths:
+                    del self.loading_paths[path]
     
     def unload_index(self, index_path: str):
         """Unload an index to free memory"""
-        if index_path in self.drivers:
-            del self.drivers[index_path]
+        normalized_path = str(Path(index_path).resolve())
+        with self._lock:
+            if normalized_path in self.drivers:
+                del self.drivers[normalized_path]
+            # If we were loading it, we let the thread finish but it won't be easily reachable
+            # in self.drivers if the user actually wanted it gone. 
+            # (In reality, unload usually means 'I don't need this anymore')
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get status of managed indexes"""
+        with self._lock:
+            return {
+                "loaded": list(self.drivers.keys()),
+                "loading": list(self.loading_paths.keys())
+            }
 
 class DaemonHandler(BaseHTTPRequestHandler):
     """HTTP request handler for daemon"""
@@ -54,6 +106,8 @@ class DaemonHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/health':
             self.handle_health()
+        elif self.path == '/status':
+            self.handle_status()
         else:
             self.send_error(404)
     
@@ -89,7 +143,7 @@ class DaemonHandler(BaseHTTPRequestHandler):
             daemon_server.logger.error(f"Search error: {e}")
     
     def handle_reload(self):
-        """Reload an index - resets inactivity timer"""
+        """Reload an index - returns 202 and loads in background"""
         daemon_server.reset_inactivity_timer()
         
         content_length = int(self.headers['Content-Length'])
@@ -102,7 +156,16 @@ class DaemonHandler(BaseHTTPRequestHandler):
             return
         
         daemon_server.index_manager.reload_index(index_path)
-        self.send_json_response(200, {"status": "reloaded"})
+        self.send_json_response(202, {
+            "status": "accepted", 
+            "message": "Index reload started in background"
+        })
+    
+    def handle_status(self):
+        """Get status of managed indexes - resets inactivity timer"""
+        daemon_server.reset_inactivity_timer()
+        status = daemon_server.index_manager.get_status()
+        self.send_json_response(200, status)
     
     def handle_health(self):
         """Health check - resets inactivity timer"""
@@ -158,7 +221,7 @@ class DaemonServer:
     
     def start(self):
         """Start daemon in background thread"""
-        self.server = HTTPServer((self.host, self.port), DaemonHandler)
+        self.server = ThreadingHTTPServer((self.host, self.port), DaemonHandler)
         global daemon_server
         daemon_server = self
         

@@ -124,11 +124,17 @@ def index(path: Path, reindex: bool):
         if ensure_daemon_running():
             try:
                 url = get_daemon_url()
-                requests.post(
+                click.echo("Notifying daemon to reload index...")
+                response = requests.post(
                     f"{url}/reload",
                     json={"index_path": str(index_dir)},
-                    timeout=5
+                    timeout=10
                 )
+                if response.status_code == 202:
+                    click.echo("Daemon is reloading the index in the background.")
+                    click.echo("Run 'filesift daemon status' to check progress.")
+                else:
+                    response.raise_for_status()
             except Exception as e:
                 click.echo(f"Warning: Could not reload index in daemon: {e}", err=True)
 
@@ -486,6 +492,29 @@ def status():
         click.echo(f"Daemon is running")
         click.echo(f"  PID: {pid}")
         click.echo(f"  URL: {url}")
+        
+        try:
+            import requests # ensure requests is available
+            status_resp = requests.get(f"{url}/status", timeout=5)
+            if status_resp.status_code == 200:
+                status_data = status_resp.json()
+                loaded = status_data.get("loaded", [])
+                loading = status_data.get("loading", [])
+                
+                if loaded:
+                    click.echo(f"  Loaded Indexes ({len(loaded)}):")
+                    for p in loaded:
+                        click.echo(f"    - {p}")
+                
+                if loading:
+                    click.echo(f"  Loading in Background ({len(loading)}):")
+                    for p in loading:
+                        click.echo(f"    - {p}")
+                elif not loaded:
+                    click.echo("  No indexes loaded.")
+        except Exception:
+            pass
+
         if timeout > 0:
             click.echo(f"  Auto-shutdown: after {timeout}s of inactivity")
         else:
@@ -616,3 +645,7 @@ def kill_daemon(pid: Optional[int], all: bool):
 def main():
     """Entry point for the CLI"""
     cli()
+
+
+if __name__ == "__main__":
+    main()
