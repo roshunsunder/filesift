@@ -227,7 +227,7 @@ class SemanticIndexer:
 
         # Batch embed
         if to_embed_data:
-            logger.info(f"Embedding {len(to_embed_data)} file(s) ({stats.cached_files} cached)...")
+            logger.debug(f"Embedding {len(to_embed_data)} file(s) ({stats.cached_files} cached)...")
             now = datetime.now().isoformat()
 
             embed_pbar = tqdm(

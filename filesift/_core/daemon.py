@@ -17,7 +17,6 @@ class IndexManager:
         self.loading_paths: Dict[str, threading.Thread] = {}
         self.indexing_paths: Dict[str, threading.Thread] = {}
         self.indexing_status: Dict[str, Dict[str, Any]] = {}
-        self.embedding_model = None
         self.logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
     
@@ -38,7 +37,7 @@ class IndexManager:
             # If it's already loading in background, we might want to wait or return None
             # For simplicity, we'll just return None here if it's already loading
             if normalized_path in self.loading_paths:
-                self.logger.info(f"Index is currently loading in background: {normalized_path}")
+                self.logger.debug(f"Index is currently loading in background: {normalized_path}")
                 return None
 
             try:
@@ -46,7 +45,7 @@ class IndexManager:
                 driver = QueryDriver()
                 driver.load_from_disk(normalized_path)
                 self.drivers[normalized_path] = driver
-                self.logger.info(f"Loaded index: {normalized_path}")
+                self.logger.debug(f"Loaded index: {normalized_path}")
                 return driver
             except Exception as e:
                 self.logger.error(f"Failed to load index {normalized_path}: {e}")
@@ -58,7 +57,7 @@ class IndexManager:
         
         with self._lock:
             if normalized_path in self.loading_paths:
-                self.logger.info(f"Reload already in progress for: {normalized_path}")
+                self.logger.debug(f"Reload already in progress for: {normalized_path}")
                 return True
             
             thread = threading.Thread(
@@ -72,13 +71,13 @@ class IndexManager:
 
     def _bg_load(self, path: str):
         """Background worker to load an index"""
-        self.logger.info(f"Starting background load for: {path}")
+        self.logger.debug(f"Starting background load for: {path}")
         try:
             driver = QueryDriver()
             driver.load_from_disk(path)
             with self._lock:
                 self.drivers[path] = driver
-                self.logger.info(f"Background load complete: {path}")
+                self.logger.debug(f"Background load complete: {path}")
         except Exception as e:
             self.logger.error(f"Background load failed for {path}: {e}")
         finally:
@@ -104,7 +103,7 @@ class IndexManager:
         
         with self._lock:
             if normalized_path in self.indexing_paths:
-                self.logger.info(f"Indexing already in progress for: {normalized_path}")
+                self.logger.debug(f"Indexing already in progress for: {normalized_path}")
                 return True
             
             self.indexing_status[normalized_path] = {"phase": "starting", "percent": 0}
@@ -120,7 +119,7 @@ class IndexManager:
 
     def _bg_index(self, path: str):
         """Background worker to run semantic indexing"""
-        self.logger.info(f"Starting background indexing for: {path}")
+        self.logger.debug(f"Starting background indexing for: {path}")
         try:
             root = Path(path)
             index_dir = root / ".filesift"
@@ -135,10 +134,7 @@ class IndexManager:
             with self._lock:
                 self.indexing_status[path] = {"phase": "loading_model", "percent": 0}
 
-            if self.embedding_model is None:
-                self.embedding_model = create_embedding_model()
-            
-            embedding_model = self.embedding_model
+            embedding_model = create_embedding_model()
             cache_dir = index_dir / SEMANTIC_CACHE_DIR
             
             indexer = SemanticIndexer(root, embedding_model, cache_dir)
@@ -158,7 +154,7 @@ class IndexManager:
                 self.indexing_status[path] = {"phase": "saving", "percent": 100}
                 
             SemanticIndexer.save(faiss_index, entries, index_dir)
-            self.logger.info(f"Background indexing complete for {path}")
+            self.logger.debug(f"Background indexing complete for {path}")
             
             # Auto-reload the index driver if it exists
             self.reload_index(path)
@@ -353,7 +349,7 @@ class DaemonServer:
              self.reset_inactivity_timer()
              return
 
-        self.logger.info(f"Daemon shutting down after {self.inactivity_timeout}s of inactivity")
+        self.logger.debug(f"Daemon shutting down after {self.inactivity_timeout}s of inactivity")
         self.stop()
     
     def start(self):
@@ -366,9 +362,9 @@ class DaemonServer:
             try:
                 if self.inactivity_timeout > 0:
                     self.reset_inactivity_timer()
-                    self.logger.info(f"Daemon started on {self.host}:{self.port} (auto-shutdown after {self.inactivity_timeout}s inactivity)")
+                    self.logger.debug(f"Daemon started on {self.host}:{self.port} (auto-shutdown after {self.inactivity_timeout}s inactivity)")
                 else:
-                    self.logger.info(f"Daemon started on {self.host}:{self.port} (auto-shutdown disabled)")
+                    self.logger.debug(f"Daemon started on {self.host}:{self.port} (auto-shutdown disabled)")
                 
                 self.server.serve_forever()
             except Exception as e:
@@ -387,7 +383,7 @@ class DaemonServer:
         if self.server:
             self.server.shutdown()
             self.server.server_close()
-            self.logger.info("Daemon stopped")
+            self.logger.debug("Daemon stopped")
 
 daemon_server = None
 

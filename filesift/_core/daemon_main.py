@@ -5,15 +5,7 @@ import os
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 import sys
-import logging
 from filesift._core.daemon import DaemonServer
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    force=True
-)
 
 if __name__ == "__main__":
     from filesift.cli.daemon_utils import save_daemon_pid
