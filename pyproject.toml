@@ -52,6 +52,7 @@ dependencies = [
     "platformdirs",
     "tomli-w",
     "PyYAML",
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -59,6 +60,7 @@ dev = []
 
 [project.scripts]
 filesift = "filesift.cli.command:main"
+filesift-mcp = "filesift.mcp.server:main"
 
 [tool.setuptools.packages.find]
 include = ["filesift*"]
