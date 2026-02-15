@@ -544,6 +544,14 @@ def status():
                         percent = info.get("percent", 0)
                         if phase == "complete":
                              click.echo(f"    - {p}: Fully indexed")
+                        elif phase == "loading_model":
+                             click.echo(f"    - {p}: Loading embedding model...")
+                        elif phase == "discovering":
+                             click.echo(f"    - {p}: Discovering files...")
+                        elif phase == "scanning":
+                             click.echo(f"    - {p}: Scanning files ({percent:.1f}%)")
+                        elif phase == "embedding":
+                             click.echo(f"    - {p}: Generating embeddings ({percent:.1f}%)")
                         elif phase == "error":
                              click.echo(f"    - {p}: Error: {info.get('error')}")
                         else:

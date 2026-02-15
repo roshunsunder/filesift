@@ -17,6 +17,7 @@ class IndexManager:
         self.loading_paths: Dict[str, threading.Thread] = {}
         self.indexing_paths: Dict[str, threading.Thread] = {}
         self.indexing_status: Dict[str, Dict[str, Any]] = {}
+        self.embedding_model = None
         self.logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
     
@@ -131,7 +132,13 @@ class IndexManager:
             
             # Run semantic indexing
             # We partially replicate Indexer logic here to use the callback
-            embedding_model = create_embedding_model()
+            with self._lock:
+                self.indexing_status[path] = {"phase": "loading_model", "percent": 0}
+
+            if self.embedding_model is None:
+                self.embedding_model = create_embedding_model()
+            
+            embedding_model = self.embedding_model
             cache_dir = index_dir / SEMANTIC_CACHE_DIR
             
             indexer = SemanticIndexer(root, embedding_model, cache_dir)

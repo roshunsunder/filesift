@@ -45,7 +45,7 @@ class SemanticIndexStats:
 class SemanticIndexer:
     """Read files, embed content directly, and build a FAISS IndexFlatIP."""
 
-    BATCH_SIZE = 32
+    BATCH_SIZE = 8
 
     def __init__(self, root: Path, embedding_model: EmbeddingModel, cache_dir: Path):
         self.root = Path(root).resolve()
@@ -103,6 +103,16 @@ class SemanticIndexer:
 
         return f"{head}\n\n...\n\n{middle}\n\n...\n\n{tail}"
 
+    def _report_progress(self, callback: callable, phase: str, total: int, current: int):
+        """Helper to send progress updates with percentage."""
+        percent = (float(current) / float(total) * 100) if total > 0 else 0
+        callback({
+            "phase": phase,
+            "total": total,
+            "current": current,
+            "percent": percent
+        })
+
     # ------------------------------------------------------------------
     # Index
     # ------------------------------------------------------------------
@@ -126,6 +136,9 @@ class SemanticIndexer:
         existing_entries = existing_entries or {}
         stats = SemanticIndexStats()
 
+        if progress_callback:
+            self._report_progress(progress_callback, "discovering", 0, 0)
+
         # Discover files
         files_to_consider: List[Path] = []
         for fp in self.root.rglob("*"):
@@ -146,8 +159,7 @@ class SemanticIndexer:
         order: List[str] = []  # relative paths in insertion order
 
         # Separate cached vs. needs-embedding
-        to_embed_paths: List[Path] = []
-        to_embed_contents: List[str] = []
+        to_embed_data: List[Dict[str, Any]] = []
 
         pbar = tqdm(
             total=len(files_to_consider),
@@ -195,36 +207,31 @@ class SemanticIndexer:
                     stats.cached_files += 1
                     pbar.update(1)
                     if progress_callback:
-                        progress_callback({
-                            "phase": "scanning",
-                            "total": len(files_to_consider),
-                            "current": pbar.n,
-                            "percent": (pbar.n / len(files_to_consider)) * 100
-                        })
+                        self._report_progress(progress_callback, "scanning", len(files_to_consider), pbar.n)
                     continue
 
             # Queue for batch embedding
-            content = self._prepare_content(raw, fp)
-            to_embed_paths.append(fp)
-            to_embed_contents.append(content)
+            to_embed_data.append({
+                "fp": fp,
+                "rel": rel,
+                "content": self._prepare_content(raw, fp),
+                "hash": chash,
+                "language": language,
+                "line_count": line_count,
+            })
             pbar.update(1)
             if progress_callback:
-                progress_callback({
-                    "phase": "scanning",
-                    "total": len(files_to_consider),
-                    "current": pbar.n,
-                    "percent": (pbar.n / len(files_to_consider)) * 100
-                })
+                self._report_progress(progress_callback, "scanning", len(files_to_consider), pbar.n)
 
         pbar.close()
 
         # Batch embed
-        if to_embed_contents:
-            print(f"Embedding {len(to_embed_contents)} file(s) ({stats.cached_files} cached)...")
+        if to_embed_data:
+            logger.info(f"Embedding {len(to_embed_data)} file(s) ({stats.cached_files} cached)...")
             now = datetime.now().isoformat()
 
             embed_pbar = tqdm(
-                total=len(to_embed_contents),
+                total=len(to_embed_data),
                 desc="Generating embeddings",
                 unit="chunk",
                 bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
@@ -233,40 +240,34 @@ class SemanticIndexer:
             )
 
             if progress_callback:
-                progress_callback({
-                    "phase": "embedding",
-                    "total": len(to_embed_contents),
-                    "current": 0,
-                    "percent": 0.0
-                })
+                self._report_progress(progress_callback, "embedding", len(to_embed_data), 0)
 
-            for batch_start in range(0, len(to_embed_contents), self.BATCH_SIZE):
-                batch_end = min(batch_start + self.BATCH_SIZE, len(to_embed_contents))
-                batch_texts = to_embed_contents[batch_start:batch_end]
-                batch_paths = to_embed_paths[batch_start:batch_end]
+            processed_files = 0
+            for batch_start in range(0, len(to_embed_data), self.BATCH_SIZE):
+                batch = to_embed_data[batch_start : batch_start + self.BATCH_SIZE]
+                batch_texts = [item["content"] for item in batch]
+                
+                try:
+                    batch_vecs = self.embedding_model.embed_batch(batch_texts)
+                except Exception as e:
+                    logger.error(f"Batch embedding failed: {e}")
+                    # Skip this batch if it fails
+                    processed_files += len(batch)
+                    embed_pbar.update(len(batch))
+                    continue
 
-                batch_vecs = self.embedding_model.embed_batch(batch_texts)
-
-                for i, fp in enumerate(batch_paths):
+                for i, item in enumerate(batch):
                     vec = batch_vecs[i]
-                    try:
-                        rel = str(fp.relative_to(self.root))
-                    except ValueError:
-                        rel = str(fp)
-
-                    raw = fp.read_text(encoding="utf-8", errors="replace")
-                    chash = content_hash(raw)
-                    language = detect_language(fp.suffix)
-                    line_count = raw.count("\n") + 1
-
-                    self.cache.put(chash, vec)
+                    rel = item["rel"]
+                    
+                    self.cache.put(item["hash"], vec)
 
                     entries[rel] = SemanticEntry(
-                        file_path=str(fp),
+                        file_path=str(item["fp"]),
                         relative_path=rel,
-                        content_hash=chash,
-                        language=language,
-                        line_count=line_count,
+                        content_hash=item["hash"],
+                        language=item["language"],
+                        line_count=item["line_count"],
                         model_used=self.embedding_model.model_name,
                         indexed_at=now,
                     )
@@ -274,14 +275,10 @@ class SemanticIndexer:
                     order.append(rel)
                     stats.new_files += 1
                 
-                embed_pbar.update(len(batch_texts))
+                processed_files += len(batch)
+                embed_pbar.update(len(batch))
                 if progress_callback:
-                    progress_callback({
-                        "phase": "embedding",
-                        "total": len(to_embed_contents),
-                        "current": embed_pbar.n,
-                        "percent": (embed_pbar.n / len(to_embed_contents)) * 100
-                    })
+                    self._report_progress(progress_callback, "embedding", len(to_embed_data), processed_files)
             
             embed_pbar.close()
         elif stats.cached_files:
