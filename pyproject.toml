@@ -44,6 +44,7 @@ urls = {Homepage = "https://github.com/roshunsunder/filesift"}
 dependencies = [
     "faiss-cpu",
     "sentence-transformers",
+    "einops",
     "rank-bm25",
     "numpy",
     "requests",

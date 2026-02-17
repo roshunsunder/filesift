@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 import json
 import logging
+import sys
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from filesift._core.query import QueryDriver
@@ -119,16 +120,16 @@ class IndexManager:
 
     def _bg_index(self, path: str):
         """Background worker to run semantic indexing"""
-        self.logger.debug(f"Starting background indexing for: {path}")
+        self.logger.info(f"Starting background indexing for: {path}")
         try:
             root = Path(path)
             index_dir = root / ".filesift"
-            
+
             # Setup callback
             def progress_callback(status):
                 with self._lock:
                     self.indexing_status[path] = status
-            
+
             # Run semantic indexing
             # We partially replicate Indexer logic here to use the callback
             with self._lock:
@@ -154,13 +155,15 @@ class IndexManager:
                 self.indexing_status[path] = {"phase": "saving", "percent": 100}
                 
             SemanticIndexer.save(faiss_index, entries, index_dir)
-            self.logger.debug(f"Background indexing complete for {path}")
+            self.logger.info(f"Background indexing complete for {path}")
             
             # Auto-reload the index driver if it exists
             self.reload_index(path)
             
         except Exception as e:
+            import traceback
             self.logger.error(f"Background indexing failed for {path}: {e}")
+            self.logger.error(traceback.format_exc())
             with self._lock:
                 self.indexing_status[path] = {"phase": "error", "error": str(e)}
         finally:

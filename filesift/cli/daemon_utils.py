@@ -73,16 +73,29 @@ def save_daemon_pid(pid: int):
 def start_daemon_process() -> bool:
     """Start daemon as a separate process"""
     import sys
+    from platformdirs import user_log_dir
     daemon_script = Path(__file__).parent.parent / "_core" / "daemon_main.py"
-    
+
     try:
+        # Create log directory for daemon output
+        log_dir = Path(user_log_dir("filesift", "filesift"))
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "daemon.log"
+
+        # Open log file and keep it open for the daemon process
+        # Don't use 'with' statement as we want the file to stay open
+        log_fd = open(log_file, 'a', buffering=1)  # Line buffered
+
         process = subprocess.Popen(
             [sys.executable, str(daemon_script)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True
+            stdout=log_fd,
+            stderr=log_fd,
+            start_new_session=True,
+            close_fds=False  # Keep file descriptors open for child
         )
+
         save_daemon_pid(process.pid)
+        # Don't close log_fd - let it stay open for the daemon
         return True
     except Exception as e:
         return False

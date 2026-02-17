@@ -21,10 +21,13 @@ class NomicEmbedModel(EmbeddingModel):
         import torch
         from sentence_transformers import SentenceTransformer
 
+        # Set torch to use single thread to avoid issues in daemon processes
+        torch.set_num_threads(1)
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self._model = SentenceTransformer(
-            "nomic-ai/nomic-embed-text-v1.5", 
+            "nomic-ai/nomic-embed-text-v1.5",
             trust_remote_code=True,
             device=device
         )
