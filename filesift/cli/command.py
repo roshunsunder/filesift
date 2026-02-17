@@ -690,6 +690,35 @@ def kill_daemon(pid: Optional[int], all: bool):
             click.echo("No registered daemon PID found.")
 
 
+SKILL_NAME = "searching-codebases"
+
+# Known agent skill directories (user-level)
+AGENT_SKILL_DIRS = {
+    "claude":    Path.home() / ".claude" / "skills",
+    "codex":     Path.home() / ".codex" / "skills",
+    "gemini":    Path.home() / ".gemini" / "skills",
+    "cursor":    Path.home() / ".cursor" / "skills",
+    "windsurf":  Path.home() / ".codeium" / "windsurf" / "skills",
+    "roo":       Path.home() / ".roo" / "skills",
+    "copilot":   Path.home() / ".github" / "skills",
+}
+
+
+def _resolve_skill_dir(agent: Optional[str], path: Optional[Path]) -> Path:
+    """Resolve the target skills directory from --agent or --path flags."""
+    if path:
+        return Path(path) / SKILL_NAME
+    if agent:
+        agent = agent.lower()
+        if agent not in AGENT_SKILL_DIRS:
+            raise click.BadParameter(
+                f"Unknown agent '{agent}'. Known agents: {', '.join(sorted(AGENT_SKILL_DIRS))}. "
+                f"Use --path for a custom location."
+            )
+        return AGENT_SKILL_DIRS[agent] / SKILL_NAME
+    return AGENT_SKILL_DIRS["claude"] / SKILL_NAME
+
+
 @cli.group()
 def skill():
     """Manage FileSift agent skills"""
@@ -697,13 +726,20 @@ def skill():
 
 
 @skill.command()
-def install():
-    """Install the FileSift skill to ~/.claude/skills/ for Claude Code discovery"""
+@click.option("--agent", type=str, default=None,
+              help=f"Target agent ({', '.join(sorted(AGENT_SKILL_DIRS))}). Default: claude.")
+@click.option("--path", type=click.Path(path_type=Path), default=None,
+              help="Custom skills directory (skill will be placed inside as a subdirectory).")
+def install(agent: Optional[str], path: Optional[Path]):
+    """Install the FileSift skill for agent discovery.
+
+    By default installs to ~/.claude/skills/. Use --agent for other agents
+    (e.g. --agent codex, --agent gemini) or --path for a custom location.
+    """
     import shutil
 
-    skill_name = "searching-codebases"
-    source = Path(__file__).parent.parent / "skills" / skill_name
-    target = Path.home() / ".claude" / "skills" / skill_name
+    source = Path(__file__).parent.parent / "skills" / SKILL_NAME
+    target = _resolve_skill_dir(agent, path)
 
     if not source.exists():
         click.echo(f"Error: Skill source not found at {source}", err=True)
@@ -717,24 +753,26 @@ def install():
 
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, target)
-    click.echo(f"Installed skill '{skill_name}' to {target}")
-    click.echo("Claude Code will now discover this skill automatically.")
+    click.echo(f"Installed skill '{SKILL_NAME}' to {target}")
 
 
 @skill.command()
-def uninstall():
-    """Remove the FileSift skill from ~/.claude/skills/"""
+@click.option("--agent", type=str, default=None,
+              help=f"Target agent ({', '.join(sorted(AGENT_SKILL_DIRS))}). Default: claude.")
+@click.option("--path", type=click.Path(path_type=Path), default=None,
+              help="Custom skills directory to uninstall from.")
+def uninstall(agent: Optional[str], path: Optional[Path]):
+    """Remove the FileSift skill from an agent's skills directory."""
     import shutil
 
-    skill_name = "searching-codebases"
-    target = Path.home() / ".claude" / "skills" / skill_name
+    target = _resolve_skill_dir(agent, path)
 
     if not target.exists():
-        click.echo(f"Skill '{skill_name}' is not installed.")
+        click.echo(f"Skill '{SKILL_NAME}' is not installed at {target}")
         return
 
     shutil.rmtree(target)
-    click.echo(f"Removed skill '{skill_name}' from {target}")
+    click.echo(f"Removed skill '{SKILL_NAME}' from {target}")
 
 
 def main():
