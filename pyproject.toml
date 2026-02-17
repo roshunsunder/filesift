@@ -67,4 +67,4 @@ filesift-mcp = "filesift.mcp.server:main"
 include = ["filesift*"]
 
 [tool.setuptools.package-data]
-filesift = ["_config/default_config.toml"]
+filesift = ["_config/default_config.toml", "skills/**/*.md"]

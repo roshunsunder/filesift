@@ -690,6 +690,53 @@ def kill_daemon(pid: Optional[int], all: bool):
             click.echo("No registered daemon PID found.")
 
 
+@cli.group()
+def skill():
+    """Manage FileSift agent skills"""
+    pass
+
+
+@skill.command()
+def install():
+    """Install the FileSift skill to ~/.claude/skills/ for Claude Code discovery"""
+    import shutil
+
+    skill_name = "searching-codebases"
+    source = Path(__file__).parent.parent / "skills" / skill_name
+    target = Path.home() / ".claude" / "skills" / skill_name
+
+    if not source.exists():
+        click.echo(f"Error: Skill source not found at {source}", err=True)
+        click.echo("This may indicate a broken installation. Try reinstalling filesift.", err=True)
+        raise click.Abort()
+
+    if target.exists():
+        click.echo(f"Skill already installed at {target}")
+        click.echo("Use 'filesift skill uninstall' first to reinstall.")
+        return
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, target)
+    click.echo(f"Installed skill '{skill_name}' to {target}")
+    click.echo("Claude Code will now discover this skill automatically.")
+
+
+@skill.command()
+def uninstall():
+    """Remove the FileSift skill from ~/.claude/skills/"""
+    import shutil
+
+    skill_name = "searching-codebases"
+    target = Path.home() / ".claude" / "skills" / skill_name
+
+    if not target.exists():
+        click.echo(f"Skill '{skill_name}' is not installed.")
+        return
+
+    shutil.rmtree(target)
+    click.echo(f"Removed skill '{skill_name}' from {target}")
+
+
 def main():
     """Entry point for the CLI"""
     cli()
