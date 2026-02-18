@@ -16,7 +16,7 @@
 
 ---
 
-FileSift lets your AI coding agent search across a codebase based on what code **does**, rather than what it looks like. Instead of sifting through entire files after a `grep`, your agent can jump straight to the most relevant code using natural language queries like *"authentication middleware"* or *"database connection pooling"*.
+FileSift lets your AI coding agent search across a codebase based on what code **does**, rather than what it looks like. Instead of sifting through entire files after a `grep`, your agent can jump straight to the most relevant code using natural language queries like *"authentication middleware"* or *"database connection pooling"*. Everything runs **locally on your machine** — your code never leaves your environment.
 
 **Key benefits:**
 - **Smarter search** — hybrid keyword + semantic search finds code by intent, not just string matching
