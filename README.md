@@ -5,7 +5,7 @@
 <h1 align="center">FileSift</h1>
 
 <p align="center">
-  <em>A fast, lightweight utility that helps AI coding agents intelligently search and understand codebases.</em>
+  <em>A fast, open-source utility that helps AI coding agents intelligently search and understand codebases.</em>
 </p>
 
 <p align="center">
