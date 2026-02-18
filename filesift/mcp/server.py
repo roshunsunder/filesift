@@ -150,12 +150,15 @@ TOOLS = [
         name="filesift_search",
         description=(
             "Search an indexed codebase by natural language query. "
-            "Combines keyword/structural search (BM25, function/class names) "
-            "with semantic embedding search (FAISS), merged via Reciprocal Rank Fusion. "
-            "Returns ranked file paths with similarity scores. "
-            "Use conceptual descriptions like 'authentication middleware' or "
-            "'database connection pooling', not code syntax. "
-            "Read the top results to understand the actual implementation."
+            "Combines BM25 keyword/structural search with semantic FAISS embeddings (nomic-embed-text-v1.5), merged via Reciprocal Rank Fusion. "
+            "Returns ranked file paths with relevance scores. "
+            "QUERY FORMULATION IS CRITICAL: the semantic index embeds raw source code, so the model matches "
+            "queries to code via docstrings, comments, and identifier names. "
+            "Translate the user's request into a SHORT (3-7 word) description of what the target code DOES, "
+            "as a developer would phrase it in a docstring — do NOT paste the user's question verbatim. "
+            "Strip question framing ('how does', 'where is', 'I need to understand'). "
+            "Lead with action verbs: 'parse HTTP response', 'validate user input', 'retry on failure'. "
+            "For multi-concept user requests, call this tool multiple times with one focused concept per query."
         ),
         inputSchema={
             "type": "object",
@@ -163,8 +166,11 @@ TOOLS = [
                 "query": {
                     "type": "string",
                     "description": (
-                        "Natural language search query. Good: 'user authentication and session management', "
-                        "'error handling and retry logic'. Bad: specific function names (use find_related for that)."
+                        "Short (3-7 word) description of what the target code DOES, in developer/docstring language. "
+                        "Good: 'user authentication', 'retry with exponential backoff', 'parse JSON response', 'database connection pooling'. "
+                        "Bad: pasting the user's full question verbatim, long multi-concept strings, "
+                        "question framing like 'how does X work', filler like 'logic for' or 'code that handles'. "
+                        "For multi-concept requests, run separate focused queries instead of combining them."
                     ),
                 },
                 "path": {

@@ -52,6 +52,25 @@ Use conceptual descriptions, not code syntax:
 
 Results are ranked by relevance score (0-1). Read the top results to understand the actual implementation.
 
+**Formulating effective queries**
+
+The semantic index embeds raw source code (identifiers, comments, docstrings). The embedding model (nomic-embed-text-v1.5) was trained on natural language, so it matches queries to code via the natural language *in* the code — docstrings, comments, and readable identifier names. Query quality directly determines result quality.
+
+**Core rule:** Translate the user's request into a short (3–7 word) description of what the target code *does*, as a developer would phrase it in a docstring. Do not paste the user's question verbatim.
+
+Guidelines:
+- **Strip question framing** — Remove "how does", "where is", "I need to understand", "code that handles". These words don't appear in code.
+- **Lead with an action verb** — "parse", "validate", "authenticate", "retry", "transform" match function names and docstrings.
+- **One concept per query** — For multi-part user requests, run separate focused queries rather than one long combined query. A single long query dilutes the embedding signal.
+- **Use developer vocabulary** — Think: what would a developer name this function, or write in its docstring?
+
+| User request | Bad query | Good queries |
+|---|---|---|
+| "How does the app handle user login and JWT tokens?" | `"how app handles user login and JWT token management"` | `"user authentication"` + `"JWT token validation"` |
+| "I want to understand how database errors are caught and retried" | `"catching retrying database errors logic"` | `"database error handling"` |
+| "Where is the config loaded from at startup?" | `"config loading parsing startup initialization"` | `"configuration loading"` |
+| "How does payment processing work, including webhooks?" | `"payment processing webhooks implementation"` | `"payment processing"` + `"webhook handler"` |
+
 ### 4. Re-index after significant changes
 
 ```bash
