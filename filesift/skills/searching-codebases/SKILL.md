@@ -54,7 +54,7 @@ Results are ranked by relevance score (0-1). Read the top results to understand 
 
 **Formulating effective queries**
 
-The semantic index embeds raw source code (identifiers, comments, docstrings). The embedding model (nomic-embed-text-v1.5) was trained on natural language, so it matches queries to code via the natural language *in* the code — docstrings, comments, and readable identifier names. Query quality directly determines result quality.
+The semantic index embeds raw source code. The embedding model (jina-embeddings-v2-base-code) was trained on 150M+ natural language / code pairs, so it bridges intent-based queries directly to code. Despite this, query quality directly determines result quality — the model encodes each query into a single dense vector, so a vague or overloaded query produces a vague result.
 
 **Core rule:** Translate the user's request into a short (3–7 word) description of what the target code *does*, as a developer would phrase it in a docstring. Do not paste the user's question verbatim.
 

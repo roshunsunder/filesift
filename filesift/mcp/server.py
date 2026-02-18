@@ -150,7 +150,7 @@ TOOLS = [
         name="filesift_search",
         description=(
             "Search an indexed codebase by natural language query. "
-            "Combines BM25 keyword/structural search with semantic FAISS embeddings (nomic-embed-text-v1.5), merged via Reciprocal Rank Fusion. "
+            "Combines BM25 keyword/structural search with semantic FAISS embeddings (jina-embeddings-v2-base-code), merged via Reciprocal Rank Fusion. "
             "Returns ranked file paths with relevance scores. "
             "QUERY FORMULATION IS CRITICAL: the semantic index embeds raw source code, so the model matches "
             "queries to code via docstrings, comments, and identifier names. "
