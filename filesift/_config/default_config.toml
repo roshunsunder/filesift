@@ -3,8 +3,8 @@
 
 # Model settings
 [models]
-# Embedding model for semantic search ("nomic" is the default local model)
-EMBEDDING_MODEL = "nomic"
+# Embedding model for semantic search ("jina" uses jinaai/jina-embeddings-v2-base-code locally)
+EMBEDDING_MODEL = "jina"
 
 # Search settings
 [search]
