@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Intelligent file indexing and search system"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [
     {name = "Roshun Sunder", email = "roshun.sunder@gmail.com"}
@@ -38,7 +38,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Filesystems",
     "Topic :: Text Processing :: Indexing",
-    "Topic :: Utilities"
+    "Topic :: Utilities",
+    "License :: OSI Approved :: Apache Software License"
 ]
 urls = {Homepage = "https://github.com/roshunsunder/filesift"}
 dependencies = [
