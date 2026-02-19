@@ -48,7 +48,7 @@ filesift find "retry logic for API calls" --path /path/to/project
 ```
 
 ### 2. MCP Server
-
+<!-- mcp-name: io.github.roshunsunder/filesift -->
 Installing FileSift also provides a `filesift-mcp` command — a lightweight [MCP](https://modelcontextprotocol.io/) server that exposes indexing and search as tools over STDIO. This works with most popular coding agents including Claude Code, Cursor, Copilot, and more.
 
 Add it to your agent's MCP configuration:
