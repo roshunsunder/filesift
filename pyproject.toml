@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "filesift"
-version = "0.1.0"
+version = "0.2.0"
 description = "Intelligent file indexing and search system"
 readme = "README.md"
-requires-python = ">=3.11"
-license = "MIT"
+requires-python = ">=3.12"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [
     {name = "Roshun Sunder", email = "roshun.sunder@gmail.com"}
@@ -24,7 +24,6 @@ keywords = [
     "code-search",
     "document-search",
     "faiss",
-    "llm",
     "embeddings",
     "natural-language-search"
 ]
@@ -33,7 +32,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -43,22 +41,19 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/roshunsunder/filesift"}
 dependencies = [
-    "langchain-community",
-    "langchain_huggingface",
     "faiss-cpu",
-    "sentence-transformers",
-    "openai",
-    "python-dotenv",
-    "tiktoken",
+    "sentence-transformers<5",
+    "transformers<5",
+    "einops",
     "rank-bm25",
+    "numpy",
+    "requests",
     "click",
     "tqdm",
     "platformdirs",
     "tomli-w",
-    "PyPDF2",
-    "python-docx",
-    "odfpy",
-    "PyYAML"
+    "PyYAML",
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -66,9 +61,10 @@ dev = []
 
 [project.scripts]
 filesift = "filesift.cli.command:main"
+filesift-mcp = "filesift.mcp.server:main"
 
 [tool.setuptools.packages.find]
 include = ["filesift*"]
 
 [tool.setuptools.package-data]
-filesift = ["_config/default_config.toml"]
+filesift = ["_config/default_config.toml", "skills/**/*.md"]

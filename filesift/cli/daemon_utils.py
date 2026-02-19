@@ -27,20 +27,37 @@ def is_daemon_running() -> bool:
         return False
 
 def get_daemon_pid() -> Optional[int]:
-    """Get the PID of the running daemon from PID file"""
-    if not DAEMON_PID_FILE.exists():
-        return None
-    try:
-        with open(DAEMON_PID_FILE, 'r') as f:
-            pid = int(f.read().strip())
+    """Get the PID of the running daemon from PID file or lsof fallback"""
+    if DAEMON_PID_FILE.exists():
         try:
-            os.kill(pid, 0)
-            return pid
-        except OSError:
-            DAEMON_PID_FILE.unlink()
-            return None
-    except (ValueError, IOError):
-        return None
+            with open(DAEMON_PID_FILE, 'r') as f:
+                pid = int(f.read().strip())
+            try:
+                os.kill(pid, 0)
+                return pid
+            except OSError:
+                DAEMON_PID_FILE.unlink()
+        except (ValueError, IOError):
+            pass
+
+    try:
+        daemon_config = config_dict.get("daemon", {})
+        port = daemon_config.get("PORT", 8687)
+        result = subprocess.run(
+            ["lsof", "-t", f"-i:{port}"], 
+            capture_output=True, 
+            text=True
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            pids = result.stdout.strip().split('\n')
+            if pids:
+                pid = int(pids[0])
+                save_daemon_pid(pid)
+                return pid
+    except Exception:
+        pass
+        
+    return None
 
 def save_daemon_pid(pid: int):
     """Save daemon PID to file"""
@@ -51,15 +68,24 @@ def save_daemon_pid(pid: int):
 def start_daemon_process() -> bool:
     """Start daemon as a separate process"""
     import sys
+    from platformdirs import user_log_dir
     daemon_script = Path(__file__).parent.parent / "_core" / "daemon_main.py"
-    
+
     try:
+        log_dir = Path(user_log_dir("filesift", "filesift"))
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "daemon.log"
+
+        log_fd = open(log_file, 'a', buffering=1)  # Line buffered
+
         process = subprocess.Popen(
             [sys.executable, str(daemon_script)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True
+            stdout=log_fd,
+            stderr=log_fd,
+            start_new_session=True,
+            close_fds=False  # Keep file descriptors open for child
         )
+
         save_daemon_pid(process.pid)
         return True
     except Exception as e:

@@ -1,19 +1,19 @@
+"""Unified query driver — merges fast tier + semantic tier via RRF."""
+
 import os
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 import logging
-from datetime import datetime
-import pickle
-import numpy as np
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from langchain_core.documents import Document
 from filesift._config.config import config_dict
+
+logger = logging.getLogger(__name__)
 
 
 class SearchResult:
-    """Represents a single search result"""
+    """Represents a single search result."""
 
     def __init__(self, path: str, score: float, metadata: Dict[str, Any]):
         self.path = path
@@ -21,213 +21,118 @@ class SearchResult:
         self.metadata = metadata
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "path": self.path,
-            "score": self.score,
-            "metadata": self.metadata,
-        }
+        return {"path": self.path, "score": self.score, "metadata": self.metadata}
 
 
 class QueryDriver:
-    """Enhanced query system with filtering"""
+    """Load fast + semantic indexes and merge results via Reciprocal Rank Fusion."""
 
     def __init__(self):
-        try:
-            from langchain_community.vectorstores.faiss import FAISS
-            from langchain_huggingface import HuggingFaceEmbeddings
-            from rank_bm25 import BM25Okapi
-        except ImportError:
-            print("Failed to find necessary libraries, QueryDriver ctor failed.")
-            return
-        
-        self.logger = logging.getLogger(__name__)
-        self.embedding_model = HuggingFaceEmbeddings(
-            model_name=config_dict["models"]["EMBEDDING_MODEL"]
-        )
-        self.vector_store: Optional[FAISS] = None
-        self.bm25_index: Optional[BM25Okapi] = None
-        self.bm25_documents: List[Document] = []
+        self._fast_searcher = None
+        self._semantic_searcher = None
 
-    def load_from_disk(self, path: str):
-        """Load the vector store and BM25 index from disk"""
+    @property
+    def semantic_available(self) -> bool:
+        return self._semantic_searcher is not None
+
+    def load_from_disk(self, path: str) -> None:
         path_obj = Path(path)
+        if (path_obj / ".filesift").is_dir():
+             path_obj = path_obj / ".filesift"
+
+        # Fast tier
         try:
-            from langchain_community.vectorstores.faiss import FAISS
-        except ImportError:
-            print("Could not load FAISS, aborting.")
-            return
-        try:
-            index_dir_name = config_dict["paths"]["INDEX_DIR_NAME"]
-            self.vector_store = FAISS.load_local(
-                str(path_obj / index_dir_name),
-                self.embedding_model,
-                allow_dangerous_deserialization=True,
-            )
+            from filesift._core.fast_storage import FastIndexStore
+            from filesift._core.fast_searcher import FastSearcher
+
+            if FastIndexStore.exists(path_obj):
+                fast_index = FastIndexStore.load(path_obj)
+                if fast_index:
+                    bm25 = FastIndexStore.load_bm25(path_obj)
+                    self._fast_searcher = FastSearcher(fast_index, bm25=bm25)
         except Exception as e:
-            self.logger.error(f"Error loading vector store: {str(e)}")
-            raise
+            logger.warning("Could not load fast index: %s", e)
 
+        # Semantic tier
         try:
-            with open(path_obj / "bm25_index.pkl", "rb") as f:
-                self.bm25_index = pickle.load(f)
-            with open(path_obj / "bm25_documents.pkl", "rb") as f:
-                self.bm25_documents = pickle.load(f)
-        except FileNotFoundError:
-            self.logger.warning("No BM25 index found, will use semantic search only")
-            self.bm25_index = None
-            self.bm25_documents = []
+            from filesift._core.semantic_indexer import SemanticIndexer
+            from filesift._core.semantic_searcher import SemanticSearcher
+
+            if SemanticIndexer.exists(path_obj):
+                from filesift._core.embeddings import create_embedding_model
+
+                embedding_model = create_embedding_model()
+                searcher = SemanticSearcher.from_disk(path_obj, embedding_model)
+                if searcher:
+                    self._semantic_searcher = searcher
         except Exception as e:
-            self.logger.warning(f"Could not load BM25 index: {str(e)}")
-            self.bm25_index = None
-            self.bm25_documents = []
-        
-    def _apply_filters(
-        self, results: List[SearchResult], filters: Dict[str, Any]
-    ) -> List[SearchResult]:
-        """Apply filters to search results"""
-        filtered = results
-        
-        for key, value in filters.items():
-            if key == "file_type":
-                filtered = [r for r in filtered if r.metadata.get("file_type") == value]
-            elif key == "min_date":
-                min_date = datetime.fromisoformat(value)
-                filtered = [r for r in filtered if datetime.fromtimestamp(r.metadata.get("modified", 0)) >= min_date]
-            elif key == "max_date":
-                max_date = datetime.fromisoformat(value)
-                filtered = [r for r in filtered if datetime.fromtimestamp(r.metadata.get("modified", 0)) <= max_date]
-            elif key == "min_size":
-                filtered = [r for r in filtered if r.metadata.get("size", 0) >= value]
-            elif key == "max_size":
-                filtered = [r for r in filtered if r.metadata.get("size", 0) <= value]
-                
-        return filtered
-    
-    def _reciprocal_rank_fusion(
-        self,
-        semantic_results: List[tuple],
-        bm25_results: List[int],
-        alpha: float = 0.5,
-        k: int = 60,
-    ) -> Dict[str, float]:
-        """
-        Combine semantic and BM25 search results using Reciprocal Rank Fusion (RRF).
-        
-        Args:
-            semantic_results: List of (doc, score) tuples from semantic search
-            bm25_results: List of document indices from BM25 search (sorted by score)
-            alpha: Weight for semantic search (1-alpha for BM25)
-            k: RRF constant (typically 60)
-        
-        Returns:
-            Dictionary mapping document paths to combined RRF scores
-        """
-        # We want intuitive, per-file behavior: each file should contribute at most
-        # once per ranking source (semantic and BM25), regardless of how many chunks
-        # it produced. To achieve this, we:
-        #   1. Track the *best* (lowest) rank per file path for semantic results.
-        #   2. Track the best rank per file path for BM25 results.
-        #   3. Compute a single RRF contribution per file per source.
-        #
-        # This avoids over‑rewarding large, heavily-chunked files compared to small
-        # files like single-caption images.
-        rrf_scores: Dict[str, float] = {}
+            logger.warning("Could not load semantic index: %s", e)
 
-        semantic_best_ranks: Dict[str, int] = {}
-        for rank, (doc, _) in enumerate(semantic_results):
-            doc_path = doc.metadata.get("path", "")
-            if not doc_path:
-                continue
-            if doc_path not in semantic_best_ranks:
-                semantic_best_ranks[doc_path] = rank
+        if not self._fast_searcher and not self._semantic_searcher:
+            raise ValueError(f"No indexes found in {path}")
 
-        bm25_best_ranks: Dict[str, int] = {}
-        for rank, doc_idx in enumerate(bm25_results):
-            if doc_idx >= len(self.bm25_documents):
-                continue
-            doc = self.bm25_documents[doc_idx]
-            doc_path = doc.metadata.get("path", "")
-            if not doc_path:
-                continue
-            if doc_path not in bm25_best_ranks:
-                bm25_best_ranks[doc_path] = rank
-
-        for doc_path, rank in semantic_best_ranks.items():
-            rrf_scores[doc_path] = rrf_scores.get(doc_path, 0.0) + alpha / (k + rank + 1)
-
-        for doc_path, rank in bm25_best_ranks.items():
-            rrf_scores[doc_path] = rrf_scores.get(doc_path, 0.0) + (1 - alpha) / (k + rank + 1)
-
-        return rrf_scores
-        
     def search(
         self, query: str, filters: Optional[Dict[str, Any]] = None
     ) -> List[SearchResult]:
-        """
-        Search the vector store with optional filters
-        
-        Args:
-            query: The search query
-            filters: Optional filters to apply. Supported filters:
-                    - file_type: str
-                    - min_date: ISO format date string
-                    - max_date: ISO format date string
-                    - min_size: int (bytes)
-                    - max_size: int (bytes)
-        """
-        if not self.vector_store:
-            raise ValueError("Vector store not loaded")
-
-        filters = filters or {}
-
         max_results = config_dict["search"]["MAX_RESULTS"]
-        
-        semantic_results = self.vector_store.similarity_search_with_score(
-            query, k=max_results * 2  # Get more candidates for hybrid search
-        )
-        
-        if self.bm25_index and self.bm25_documents:
-            tokenized_query = query.lower().split()
-            bm25_scores = self.bm25_index.get_scores(tokenized_query)
-            bm25_top_k = np.argsort(bm25_scores)[-max_results * 2:][::-1]
-            bm25_top_k = [int(idx) for idx in bm25_top_k if bm25_scores[idx] > 0]
-        else:
-            bm25_top_k = []
-        
-        if bm25_top_k:
-            rrf_scores = self._reciprocal_rank_fusion(semantic_results, bm25_top_k)
-            
-            semantic_map: Dict[str, tuple[Document, float]] = {}
-            for doc, score in semantic_results:
-                path = doc.metadata.get("path", "")
-                if not path:
-                    continue
-                if path not in semantic_map:
-                    semantic_map[path] = (doc, 1.0 - score)
-            
-            sorted_paths = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
-            results = []
-            
-            for path, rrf_score in sorted_paths[:max_results]:
-                if path in semantic_map:
-                    doc, semantic_sim = semantic_map[path]
-                    results.append(SearchResult(
-                        path=path,
-                        score=rrf_score,
-                        metadata=doc.metadata
-                    ))
-        else:
-            similarity_threshold = config_dict["search"]["SIMILARITY_THRESHOLD"]
-            results = [
-                SearchResult(
-                    path=doc.metadata["path"],
-                    score=1.0 - score,
-                    metadata=doc.metadata
-                )
-                for doc, score in semantic_results
-                if (1.0 - score) >= similarity_threshold
-            ][:max_results]
-        
-        results = self._apply_filters(results, filters)
+        threshold = config_dict["search"]["SIMILARITY_THRESHOLD"]
 
-        return results
+        fast_results = []
+        semantic_results = []
+
+        if self._fast_searcher:
+            fast_results = self._fast_searcher.search(query, max_results=max_results * 2)
+
+        if self._semantic_searcher:
+            semantic_results = self._semantic_searcher.search(query, max_results=max_results * 2)
+
+        if fast_results and semantic_results:
+            return self._merge_rrf(fast_results, semantic_results, max_results)
+
+        if semantic_results:
+            results = []
+            for r in semantic_results[:max_results]:
+                if r.score >= threshold:
+                    results.append(SearchResult(
+                        path=r.file_path,
+                        score=r.score,
+                        metadata={"language": r.language, "line_count": r.line_count},
+                    ))
+            return results
+
+        if fast_results:
+            return [
+                SearchResult(
+                    path=r.file_path,
+                    score=r.score,
+                    metadata=r.metadata,
+                )
+                for r in fast_results[:max_results]
+            ]
+
+        return []
+
+    @staticmethod
+    def _merge_rrf(fast_results, semantic_results, max_results, alpha=0.5, k=60):
+        """Reciprocal Rank Fusion across fast and semantic tiers."""
+        rrf_scores: Dict[str, float] = {}
+        metadata_map: Dict[str, Dict[str, Any]] = {}
+
+        for rank, r in enumerate(fast_results):
+            path = r.file_path
+            rrf_scores[path] = rrf_scores.get(path, 0.0) + (1 - alpha) / (k + rank + 1)
+            if path not in metadata_map:
+                metadata_map[path] = r.metadata
+
+        for rank, r in enumerate(semantic_results):
+            path = r.file_path
+            rrf_scores[path] = rrf_scores.get(path, 0.0) + alpha / (k + rank + 1)
+            if path not in metadata_map:
+                metadata_map[path] = {"language": r.language, "line_count": r.line_count}
+
+        ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:max_results]
+
+        return [
+            SearchResult(path=path, score=score, metadata=metadata_map.get(path, {}))
+            for path, score in ranked
+        ]
