@@ -31,6 +31,10 @@ class QueryDriver:
         self._fast_searcher = None
         self._semantic_searcher = None
 
+    @property
+    def semantic_available(self) -> bool:
+        return self._semantic_searcher is not None
+
     def load_from_disk(self, path: str) -> None:
         path_obj = Path(path)
         if (path_obj / ".filesift").is_dir():

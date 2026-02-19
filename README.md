@@ -71,7 +71,7 @@ The MCP server exposes four tools:
 
 ### 3. Skills
 
-FileSift ships with a `searching-codebases` skill that can be installed directly into your coding agent's skill directory. This lets the agent interact with the FileSift CLI through bash, without requiring MCP support.
+FileSift ships with a `search-codebase` skill that can be installed directly into your coding agent's skill directory. This lets the agent interact with the FileSift CLI through bash, without requiring MCP support.
 
 ```bash
 # Install for Claude Code (default)

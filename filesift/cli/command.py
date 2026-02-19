@@ -54,6 +54,9 @@ def find(query: str, path: Optional[Path]):
                 for r in data["results"]
             ]
 
+            if not data.get("semantic_available", True):
+                click.echo("Warning: Semantic index is not available for this directory yet. Results may not be as good.", err=True)
+
             _print_results(results)
             return
         except Exception as e:
@@ -72,6 +75,8 @@ def find(query: str, path: Optional[Path]):
         query_driver.load_from_disk(str(index_dir))
 
         click.echo(f"Searching for: {query}")
+        if not query_driver.semantic_available:
+            click.echo("Warning: Semantic index is not available for this directory yet. Results may not be as good.", err=True)
         results = query_driver.search(query)
         _print_results(results)
 
@@ -690,7 +695,7 @@ def kill_daemon(pid: Optional[int], all: bool):
             click.echo("No registered daemon PID found.")
 
 
-SKILL_NAME = "searching-codebases"
+SKILL_NAME = "search-codebase"
 
 # Known agent skill directories (user-level)
 AGENT_SKILL_DIRS = {

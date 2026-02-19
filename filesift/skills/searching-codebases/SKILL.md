@@ -1,5 +1,5 @@
 ---
-name: searching-codebases
+name: search-codebase
 description: >-
   Searches and indexes codebases using natural language queries via hybrid
   keyword and semantic search. Use when the user wants to find files in a

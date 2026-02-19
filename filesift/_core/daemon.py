@@ -247,7 +247,8 @@ class DaemonHandler(BaseHTTPRequestHandler):
         try:
             results = driver.search(query, filters)
             response = {
-                "results": [r.to_dict() for r in results]
+                "results": [r.to_dict() for r in results],
+                "semantic_available": driver.semantic_available,
             }
             self.send_json_response(200, response)
         except Exception as e:

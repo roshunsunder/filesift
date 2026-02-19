@@ -45,7 +45,7 @@ class SemanticIndexStats:
 class SemanticIndexer:
     """Read files, embed content directly, and build a FAISS IndexFlatIP."""
 
-    BATCH_SIZE = 8
+    BATCH_SIZE = 4
 
     def __init__(self, root: Path, embedding_model: EmbeddingModel, cache_dir: Path):
         self.root = Path(root).resolve()
