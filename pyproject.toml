@@ -38,8 +38,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Filesystems",
     "Topic :: Text Processing :: Indexing",
-    "Topic :: Utilities",
-    "License :: OSI Approved :: Apache Software License"
+    "Topic :: Utilities"
 ]
 urls = {Homepage = "https://github.com/roshunsunder/filesift"}
 dependencies = [
