@@ -35,14 +35,11 @@ class IndexManager:
             if normalized_path in self.drivers:
                 return self.drivers[normalized_path]
             
-            # If it's already loading in background, we might want to wait or return None
-            # For simplicity, we'll just return None here if it's already loading
             if normalized_path in self.loading_paths:
                 self.logger.debug(f"Index is currently loading in background: {normalized_path}")
                 return None
 
             try:
-                # Synchronous load for immediate search needs if not already loading
                 driver = QueryDriver()
                 driver.load_from_disk(normalized_path)
                 self.drivers[normalized_path] = driver
@@ -92,11 +89,6 @@ class IndexManager:
         with self._lock:
             if normalized_path in self.drivers:
                 del self.drivers[normalized_path]
-            # If we were loading it, we let the thread finish but it won't be easily reachable
-            # in self.drivers if the user actually wanted it gone. 
-            # (In reality, unload usually means 'I don't need this anymore')
-
-            # In reality, unload usually means 'I don't need this anymore')
     
     def trigger_semantic_index(self, index_path: str) -> bool:
         """Trigger background semantic indexing"""
@@ -125,7 +117,6 @@ class IndexManager:
             root = Path(path)
             index_dir = root / ".filesift"
 
-            # Setup callback
             def progress_callback(status):
                 with self._lock:
                     self.indexing_status[path] = status
@@ -157,7 +148,6 @@ class IndexManager:
             SemanticIndexer.save(faiss_index, entries, index_dir)
             self.logger.info(f"Background indexing complete for {path}")
             
-            # Auto-reload the index driver if it exists
             self.reload_index(path)
             
         except Exception as e:
@@ -170,11 +160,6 @@ class IndexManager:
             with self._lock:
                 if path in self.indexing_paths:
                     del self.indexing_paths[path]
-                # We optionally keep the status around for a bit, or clear it
-                # For now, let's keep "completed" status or clear it if successful?
-                # Let's clear it from 'indexing_paths' implies it's done. 
-                # But 'indexing_status' might be useful to show "Done".
-                # We'll leave it in indexing_status but maybe mark as done.
                 if path in self.indexing_status and "error" not in self.indexing_status[path]:
                      self.indexing_status[path] = {"phase": "complete", "percent": 100}
 
@@ -184,11 +169,6 @@ class IndexManager:
             # Check staleness for loaded drivers
             stale_status = {}
             for path, driver in self.drivers.items():
-                # We can't easily check staleness without checking files.
-                # Let's instantiate a lightweight SemanticIndexer to check.
-                # Or just assume not stale for now unless we want to do IO here.
-                # Better: cache the staleness check?
-                # For now, let's just properly report what is known.
                 pass
 
             return {

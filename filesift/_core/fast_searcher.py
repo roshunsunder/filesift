@@ -22,7 +22,7 @@ class FastSearchResult:
 class FastSearcher:
     def __init__(self, index: FastIndex, bm25: Optional[BM25Okapi] = None):
         self.index = index
-        # Sorted keys so the order matches the BM25 corpus built in FastIndexStore
+        # Matches the BM25 corpus built in FastIndexStore
         self._sorted_keys = sorted(index.files.keys())
         self._bm25 = bm25 if bm25 is not None else self._build_bm25()
 
@@ -71,7 +71,7 @@ class FastSearcher:
             all_names = [n.lower() for n in entry.functions + entry.classes]
             for name in all_names:
                 if name == q_lower:
-                    score = max(score, 1.0)  # exact match
+                    score = max(score, 1.0)
                 elif q_lower in name:
                     score = max(score, 0.7)
                 elif name in q_lower:
@@ -160,7 +160,7 @@ class FastSearcher:
                         matched_terms.append(name)
                 if tok in rel_path.lower():
                     matched_terms.append(rel_path)
-            matched_terms = list(dict.fromkeys(matched_terms))[:10]  # dedupe, cap
+            matched_terms = list(dict.fromkeys(matched_terms))[:10]
 
             results.append(FastSearchResult(
                 file_path=rel_path,

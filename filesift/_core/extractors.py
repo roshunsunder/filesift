@@ -1,10 +1,9 @@
-"""Per-language regex extractors for structural code analysis (no LLM)."""
+"""Per-language regex extractors for structural code analysis."""
 
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Callable, Tuple
 
-# Extension-to-language mapping (shared with CodeProcessor._detect_language)
 EXT_TO_LANGUAGE: Dict[str, str] = {
     ".py": "python",
     ".js": "javascript",
@@ -43,7 +42,6 @@ EXT_TO_LANGUAGE: Dict[str, str] = {
     ".env": "config",
 }
 
-# All extensions the fast indexer supports
 SUPPORTED_EXTENSIONS = set(EXT_TO_LANGUAGE.keys())
 
 

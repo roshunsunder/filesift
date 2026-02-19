@@ -83,7 +83,7 @@ class _State:
         key = self._normalize(path)
         with self._lock:
             if key in self._indexing_threads:
-                return  # already running
+                return
             self._indexing_status[key] = {"phase": "starting", "percent": 0}
 
         def _bg_index():
@@ -294,7 +294,6 @@ def _handle_search(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         config_dict["search"]["MAX_RESULTS"] = old_max
 
-    # Enrich with fast index metadata if available
     fast_index = state.get_fast_index(path)
     enriched = []
     for r in results:
@@ -317,7 +316,6 @@ def _handle_search(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
         "results": enriched,
     }
 
-    # Note if semantic index is still building
     idx_status = state.get_indexing_status(path)
     if idx_status and idx_status.get("phase") not in ("complete", "error", None):
         response["note"] = (
@@ -340,19 +338,15 @@ def _handle_find_related(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     related: List[Dict[str, Any]] = []
     seen: set = set()
 
-    # 1. Dependency graph from fast index
     fast_index = state.get_fast_index(path)
     if fast_index:
-        # Normalize the file_path to match index keys
         target = file_path
         if target not in fast_index.files:
-            # Try matching by suffix
             for key in fast_index.files:
                 if key.endswith(file_path) or file_path.endswith(key):
                     target = key
                     break
             else:
-                # File not in index
                 return {
                     "error": f"File '{file_path}' not found in fast index.",
                     "hint": "Use a path relative to the project root.",
@@ -360,18 +354,15 @@ def _handle_find_related(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
 
         dep = fast_index.dependency_graph
         if dep:
-            # Files this file imports
             for imp in dep.imports.get(target, []):
                 if imp not in seen and imp != target:
                     related.append({"file_path": imp, "relationship": "imports", "score": 1.0})
                     seen.add(imp)
-            # Files that import this file
             for dep_file in dep.dependents.get(target, []):
                 if dep_file not in seen and dep_file != target:
                     related.append({"file_path": dep_file, "relationship": "imported_by", "score": 1.0})
                     seen.add(dep_file)
 
-    # 2. Semantic similarity
     try:
         from filesift._core.embeddings import create_embedding_model
         from filesift._core.semantic_searcher import SemanticSearcher
@@ -379,11 +370,9 @@ def _handle_find_related(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
         embedding_model = create_embedding_model()
         searcher = SemanticSearcher.from_disk(index_dir, embedding_model)
         if searcher:
-            # Read the file and embed it as a query
             full_file = Path(path) / file_path
             if full_file.exists():
                 content = full_file.read_text(encoding="utf-8", errors="replace")
-                # Truncate for embedding
                 if len(content) > 8000:
                     content = content[:4000] + "\n...\n" + content[-2000:]
                 sem_results = searcher.search(content, max_results=max_results + 5)
@@ -398,7 +387,6 @@ def _handle_find_related(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.warning("Semantic similarity lookup failed: %s", e)
 
-    # Sort: dependency links first (score=1.0), then by semantic score
     related.sort(key=lambda x: x["score"], reverse=True)
     related = related[:max_results]
 
@@ -415,7 +403,6 @@ def _handle_status(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
         result["message"] = "No .filesift directory found. Use filesift_index to index this directory."
         return result
 
-    # Fast index
     from filesift._core.fast_storage import FastIndexStore
 
     if FastIndexStore.exists(index_dir):
@@ -430,7 +417,6 @@ def _handle_status(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     else:
         result["fast_index"] = {"available": False}
 
-    # Semantic index
     from filesift._core.semantic_indexer import SemanticIndexer
 
     if SemanticIndexer.exists(index_dir):
@@ -448,7 +434,6 @@ def _handle_status(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     else:
         result["semantic_index"] = {"available": False}
 
-    # Background indexing status
     idx_status = state.get_indexing_status(path)
     if idx_status:
         result["background_indexing"] = idx_status
@@ -464,7 +449,6 @@ def _handle_index(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     if not root.is_dir():
         return {"error": f"Directory not found: {path}"}
 
-    # Fast index (synchronous — completes in seconds)
     from filesift._core.indexer import Indexer
 
     try:
@@ -476,7 +460,6 @@ def _handle_index(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
     fast_index = state.get_fast_index(path)
     fast_count = len(fast_index.files) if fast_index else 0
 
-    # Invalidate cached driver so next search picks up new fast index
     state.invalidate(path)
 
     result: Dict[str, Any] = {
@@ -484,7 +467,6 @@ def _handle_index(state: _State, args: Dict[str, Any]) -> Dict[str, Any]:
         "fast_index": {"status": "complete", "file_count": fast_count},
     }
 
-    # Semantic index (background)
     state.trigger_semantic_index(path, reindex=reindex)
     result["semantic_index"] = {
         "status": "indexing_in_background",

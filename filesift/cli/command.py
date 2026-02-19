@@ -120,7 +120,6 @@ def index(path: Path, reindex: bool, no_semantic: bool):
     root = Path(path).resolve()
     click.echo(f"Indexing {root}...")
     
-    # 1. Run Fast Indexing (Synchronous)
     indexer = Indexer(root)
     indexer.index(reindex=reindex, semantic=False)
     click.echo("Fast index built. You can now use 'filesift find'.")
@@ -128,7 +127,6 @@ def index(path: Path, reindex: bool, no_semantic: bool):
     if no_semantic:
         return
 
-    # 2. Trigger Background Semantic Indexing
     if ensure_daemon_running():
         try:
             url = get_daemon_url()
@@ -501,7 +499,7 @@ def status():
         click.echo(f"  URL: {url}")
         
         try:
-            import requests # ensure requests is available
+            import requests
             status_resp = requests.get(f"{url}/status", timeout=5)
             if status_resp.status_code == 200:
                 status_data = status_resp.json()
@@ -513,7 +511,6 @@ def status():
                     click.echo(f"  Loaded Indexes ({len(loaded)}):")
                     for p in loaded:
                         stale_msg = ""
-                        # Check staleness - assuming local access for now
                         try:
                             from pathlib import Path
                             import json
@@ -521,12 +518,9 @@ def status():
                             idx_path = Path(p) / ".filesift" / "semantic_index.json"
                             if idx_path.exists():
                                 idx_mtime = idx_path.stat().st_mtime
-                                # Check for newer files (excluding hidden/virtual envs coarsely)
-                                # A full scan might be slow, so we'll do a quick check
                                 root = Path(p)
                                 for fp in root.rglob("*"):
                                     if fp.is_file() and not fp.name.startswith("."):
-                                        # Skip common ignore dirs if possible, but for now simple rglob
                                         if "venv" in str(fp) or "__pycache__" in str(fp) or ".filesift" in str(fp):
                                             continue
                                         if fp.stat().st_mtime > idx_mtime:
@@ -565,7 +559,6 @@ def status():
                 if not loaded and not loading and not indexing:
                     click.echo("  No indexes active.")
         except Exception as e:
-            # click.echo(f"Error fetching status: {e}") 
             pass
 
         if timeout > 0:
@@ -697,7 +690,6 @@ def kill_daemon(pid: Optional[int], all: bool):
 
 SKILL_NAME = "search-codebase"
 
-# Known agent skill directories (user-level)
 AGENT_SKILL_DIRS = {
     "claude":    Path.home() / ".claude" / "skills",
     "codex":     Path.home() / ".codex" / "skills",

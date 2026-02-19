@@ -10,7 +10,7 @@ description: >-
 compatibility: Requires the filesift Python package (pip install filesift). Python 3.11+.
 metadata:
   author: roshunsunder
-  version: "0.2.0"
+  version: "1.0.0"
 allowed-tools: Bash(filesift:*)
 ---
 

@@ -37,7 +37,6 @@ class FastIndexer:
 
     def _should_index(self, file_path: Path) -> bool:
         """Return True if the file extension is supported and it isn't in an excluded dir."""
-        # Always exclude .filesift directories (including nested ones)
         if ".filesift" in str(file_path):
             return False
             
@@ -128,7 +127,7 @@ class FastIndexer:
             exports=result.exports,
             functions=result.functions,
             classes=result.classes,
-            comments=result.comments[:50],  # cap stored comments
+            comments=result.comments[:50],
             keywords=keywords,
         )
 
@@ -257,8 +256,6 @@ class FastIndexer:
         """Resolve import strings to project-internal file paths."""
         graph = DependencyGraph()
 
-        # Build a lookup: module-style name -> relative path
-        # e.g. "filesift._core.fast_index" or "fast_index" -> "filesift/_core/fast_index.py"
         module_lookup: Dict[str, str] = {}
         for rel_path in index.files:
             # Strip extension, convert path separators to dots
@@ -299,7 +296,6 @@ class FastIndexer:
                     if rel_path not in deps:
                         deps.append(rel_path)
 
-        # Sort dependents lists for determinism
         for key in graph.dependents:
             graph.dependents[key] = sorted(graph.dependents[key])
 

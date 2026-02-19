@@ -28,7 +28,6 @@ def is_daemon_running() -> bool:
 
 def get_daemon_pid() -> Optional[int]:
     """Get the PID of the running daemon from PID file or lsof fallback"""
-    # 1. Try PID file first
     if DAEMON_PID_FILE.exists():
         try:
             with open(DAEMON_PID_FILE, 'r') as f:
@@ -38,15 +37,12 @@ def get_daemon_pid() -> Optional[int]:
                 return pid
             except OSError:
                 DAEMON_PID_FILE.unlink()
-                # Fallthrough to lsof check
         except (ValueError, IOError):
             pass
 
-    # 2. Fallback: Check who is listening on the port
     try:
         daemon_config = config_dict.get("daemon", {})
         port = daemon_config.get("PORT", 8687)
-        # Use lsof to find the PID listening on the port
         result = subprocess.run(
             ["lsof", "-t", f"-i:{port}"], 
             capture_output=True, 
@@ -56,7 +52,6 @@ def get_daemon_pid() -> Optional[int]:
             pids = result.stdout.strip().split('\n')
             if pids:
                 pid = int(pids[0])
-                # If we found it via lsof but file was missing/stale, update the file
                 save_daemon_pid(pid)
                 return pid
     except Exception:
@@ -77,13 +72,10 @@ def start_daemon_process() -> bool:
     daemon_script = Path(__file__).parent.parent / "_core" / "daemon_main.py"
 
     try:
-        # Create log directory for daemon output
         log_dir = Path(user_log_dir("filesift", "filesift"))
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "daemon.log"
 
-        # Open log file and keep it open for the daemon process
-        # Don't use 'with' statement as we want the file to stay open
         log_fd = open(log_file, 'a', buffering=1)  # Line buffered
 
         process = subprocess.Popen(
@@ -95,7 +87,6 @@ def start_daemon_process() -> bool:
         )
 
         save_daemon_pid(process.pid)
-        # Don't close log_fd - let it stay open for the daemon
         return True
     except Exception as e:
         return False

@@ -76,7 +76,7 @@ class SemanticIndexer:
         For large files, extract a representative sample:
         imports/signatures at the top, a middle sample, and the tail.
         """
-        max_chars = self.embedding_model.max_tokens * 4  # rough char estimate
+        max_chars = self.embedding_model.max_tokens * 4  # rough estimate
         if len(content) <= max_chars:
             return content
 
@@ -158,7 +158,6 @@ class SemanticIndexer:
         vectors: List[np.ndarray] = []  # ordered parallel to entries
         order: List[str] = []  # relative paths in insertion order
 
-        # Separate cached vs. needs-embedding
         to_embed_data: List[Dict[str, Any]] = []
 
         pbar = tqdm(
@@ -188,7 +187,6 @@ class SemanticIndexer:
             language = detect_language(fp.suffix)
             line_count = raw.count("\n") + 1
 
-            # Check if unchanged and cached
             old = existing_entries.get(rel)
             if old and old.content_hash == chash and self.cache.has(chash):
                 vec = self.cache.get(chash)
@@ -210,7 +208,6 @@ class SemanticIndexer:
                         self._report_progress(progress_callback, "scanning", len(files_to_consider), pbar.n)
                     continue
 
-            # Queue for batch embedding
             to_embed_data.append({
                 "fp": fp,
                 "rel": rel,
@@ -225,7 +222,6 @@ class SemanticIndexer:
 
         pbar.close()
 
-        # Batch embed
         if to_embed_data:
             logger.debug(f"Embedding {len(to_embed_data)} file(s) ({stats.cached_files} cached)...")
             now = datetime.now().isoformat()
@@ -251,7 +247,6 @@ class SemanticIndexer:
                     batch_vecs = self.embedding_model.embed_batch(batch_texts)
                 except Exception as e:
                     logger.error(f"Batch embedding failed: {e}")
-                    # Skip this batch if it fails
                     processed_files += len(batch)
                     embed_pbar.update(len(batch))
                     continue
@@ -284,14 +279,12 @@ class SemanticIndexer:
         elif stats.cached_files:
             print(f"All {stats.cached_files} file(s) loaded from cache")
 
-        # Build FAISS index
         dim = self.embedding_model.dimension
         faiss_index = faiss.IndexFlatIP(dim)
         if vectors:
             matrix = np.stack(vectors).astype(np.float32)
             faiss_index.add(matrix)
 
-        # Reorder entries dict to match FAISS row order
         ordered_entries: Dict[str, SemanticEntry] = {}
         for rel in order:
             ordered_entries[rel] = entries[rel]
@@ -359,17 +352,14 @@ class SemanticIndexer:
         try:
             with open(meta_path) as f:
                 meta = json.load(f)
-            # Find the latest 'indexed_at' timestamp
             if not meta.get("entries"):
-                return True # Empty index is effectively stale if files exist
+                return True
             
             # This is a heuristic: check if any file in root is newer than the index file
             # or newer than the latest entry.
             # Using index file mtime is a good proxy for "last build time".
             index_mtime = meta_path.stat().st_mtime
             
-            # Check a sample of files or all files for freshness
-            # For speed, we can check recent mtimes in a quick scan
             for fp in self.root.rglob("*"):
                 if fp.is_file() and self._should_index(fp):
                     if fp.stat().st_mtime > index_mtime:

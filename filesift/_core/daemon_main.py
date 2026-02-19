@@ -10,7 +10,6 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 import sys
 import logging
 
-# Setup logging - this was removed in commit 6c5890c but is needed for error visibility
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

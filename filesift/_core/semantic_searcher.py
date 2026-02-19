@@ -33,7 +33,6 @@ class SemanticSearcher:
         embedding_model: EmbeddingModel,
     ):
         self.faiss_index = faiss_index
-        # Maintain ordered list for row-index lookup
         self._ordered_keys: List[str] = list(entries.keys())
         self._entries = entries
         self.embedding_model = embedding_model
@@ -46,7 +45,6 @@ class SemanticSearcher:
         k = min(self.faiss_index.ntotal, max_results * 3)
         scores, indices = self.faiss_index.search(query_vec, k)
 
-        # Deduplicate by file path (keep best score per file)
         best: Dict[str, float] = {}
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0 or idx >= len(self._ordered_keys):
@@ -56,7 +54,6 @@ class SemanticSearcher:
             if rel not in best or clamped > best[rel]:
                 best[rel] = clamped
 
-        # Sort by score descending
         ranked = sorted(best.items(), key=lambda x: x[1], reverse=True)[:max_results]
 
         results = []

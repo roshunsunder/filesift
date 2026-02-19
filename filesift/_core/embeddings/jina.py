@@ -1,4 +1,4 @@
-"""Jina Code v2 embeddings via sentence-transformers (local)."""
+"""Jina Code v2 embeddings via sentence-transformers."""
 
 import numpy as np
 

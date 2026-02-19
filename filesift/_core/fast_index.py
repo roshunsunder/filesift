@@ -1,4 +1,4 @@
-"""Data structures for the fast (no-LLM) indexing tier."""
+"""Data structures for the fast indexing tier."""
 
 from dataclasses import dataclass, field
 from datetime import datetime

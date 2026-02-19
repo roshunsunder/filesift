@@ -83,11 +83,9 @@ class QueryDriver:
         if self._semantic_searcher:
             semantic_results = self._semantic_searcher.search(query, max_results=max_results * 2)
 
-        # If both tiers are available, merge via RRF
         if fast_results and semantic_results:
             return self._merge_rrf(fast_results, semantic_results, max_results)
 
-        # Single-tier fallback
         if semantic_results:
             results = []
             for r in semantic_results[:max_results]:

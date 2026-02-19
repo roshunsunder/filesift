@@ -41,7 +41,6 @@ def load_config() -> dict:
     defaults = get_default_config()
 
     if not config_file.exists():
-        # Write defaults for first-time users
         text = resources.files("filesift._config").joinpath("default_config.toml").read_text()
         config_file.write_text(text)
         return dict(defaults)
