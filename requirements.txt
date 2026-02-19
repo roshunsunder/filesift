@@ -1,5 +1,6 @@
 faiss-cpu
-sentence-transformers
+sentence-transformers<5
+transformers<5
 rank-bm25
 numpy
 requests
