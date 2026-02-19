@@ -30,24 +30,31 @@ class IndexManager:
     def get_driver(self, index_path: str) -> Optional[QueryDriver]:
         """Get or load QueryDriver for a given index path (blocking)"""
         normalized_path = self._normalize_path(index_path)
-        
+
         with self._lock:
             if normalized_path in self.drivers:
                 return self.drivers[normalized_path]
-            
+
             if normalized_path in self.loading_paths:
                 self.logger.debug(f"Index is currently loading in background: {normalized_path}")
                 return None
 
-            try:
-                driver = QueryDriver()
-                driver.load_from_disk(normalized_path)
+        # Load without holding the lock — model loading can take a long time
+        # (e.g. downloading sentence-transformers on first run) and would block
+        # get_status(), is_busy(), and the background indexing progress callbacks.
+        try:
+            driver = QueryDriver()
+            driver.load_from_disk(normalized_path)
+        except Exception as e:
+            self.logger.error(f"Failed to load index {normalized_path}: {e}")
+            return None
+
+        with self._lock:
+            # Another thread may have stored a driver while we were loading; prefer theirs.
+            if normalized_path not in self.drivers:
                 self.drivers[normalized_path] = driver
                 self.logger.debug(f"Loaded index: {normalized_path}")
-                return driver
-            except Exception as e:
-                self.logger.error(f"Failed to load index {normalized_path}: {e}")
-                return None
+            return self.drivers[normalized_path]
     
     def reload_index(self, index_path: str) -> bool:
         """Trigger a reload of an index in the background"""

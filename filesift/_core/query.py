@@ -55,13 +55,16 @@ class QueryDriver:
 
         # Semantic tier
         try:
-            from filesift._core.embeddings import create_embedding_model
+            from filesift._core.semantic_indexer import SemanticIndexer
             from filesift._core.semantic_searcher import SemanticSearcher
 
-            embedding_model = create_embedding_model()
-            searcher = SemanticSearcher.from_disk(path_obj, embedding_model)
-            if searcher:
-                self._semantic_searcher = searcher
+            if SemanticIndexer.exists(path_obj):
+                from filesift._core.embeddings import create_embedding_model
+
+                embedding_model = create_embedding_model()
+                searcher = SemanticSearcher.from_disk(path_obj, embedding_model)
+                if searcher:
+                    self._semantic_searcher = searcher
         except Exception as e:
             logger.warning("Could not load semantic index: %s", e)
 
