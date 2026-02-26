@@ -99,8 +99,6 @@ def _print_results(results) -> None:
             parts.append(f"Language: {result.metadata['language']}")
         if result.metadata.get("line_count"):
             parts.append(f"Lines: {result.metadata['line_count']}")
-        if result.score:
-            parts.append(f"Score: {result.score:.4f}")
         if parts:
             click.echo(f"   {' | '.join(parts)}")
         click.echo()
