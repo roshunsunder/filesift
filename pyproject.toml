@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "filesift"
-version = "0.2.0"
+version = "0.2.1"
 description = "Intelligent file indexing and search system"
 readme = "README.md"
 requires-python = ">=3.12"
