@@ -28,7 +28,7 @@ filesift --version
 
 If the command is found, proceed to [Quick start](#quick-start).
 
-If it isn't found, install it. FileSift requires **Python 3.12+** and is published on PyPI. The right install command depends on how the user manages Python packages. Use whatever context you have — lock files, config files, prior conversation — to pick the correct one. If you're unsure, ask before running anything.
+If it isn't found, install it. FileSift requires **Python 3.12+** and is published on PyPI. The right install command depends on how the user manages Python packages. If you're unsure, ask before running anything.
 
 | Environment | Install command |
 |---|---|
@@ -39,13 +39,6 @@ If it isn't found, install it. FileSift requires **Python 3.12+** and is publish
 | poetry | `poetry add filesift` |
 | pdm | `pdm add filesift` |
 | conda / mamba | `pip install filesift` (inside the active conda env) |
-
-**Hints for inferring the right tool:**
-- `uv.lock` or `[tool.uv]` in `pyproject.toml` → user likely uses `uv`
-- `poetry.lock` or `[tool.poetry]` in `pyproject.toml` → use `poetry add`
-- `pdm.lock` → use `pdm add`
-- A plain `requirements.txt` with no other tooling → use `pip install`
-- If the user is in an active virtualenv (check `$VIRTUAL_ENV`), use `pip install` inside it
 
 After installing, confirm with `filesift --version` before proceeding.
 
