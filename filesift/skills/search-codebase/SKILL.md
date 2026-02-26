@@ -83,6 +83,17 @@ Use conceptual descriptions, not code syntax:
 
 Results are ranked by relevance score (0-1). Read the top results to understand the actual implementation.
 
+**Iterating on results**
+
+A single search is rarely enough for complex questions. If the top results don't contain what you're looking for, don't stop — reframe and search again. Treat FileSift like a conversation: each result gives you vocabulary (function names, module names, patterns) you can feed into the next query. Common iteration strategies:
+
+- Results are in the right area but too broad → narrow with a more specific verb or concept (`"parse JWT claims"` instead of `"authentication"`)
+- Results miss the mark entirely → try a synonym or a different layer of abstraction (`"token refresh"` instead of `"login"`)
+- You found one relevant file but need its collaborators → query for what that file *calls* (`"session store write"`, `"user lookup by id"`)
+- A concept spans multiple files → run separate focused queries for each sub-concern and union the results yourself
+
+Only conclude that something doesn't exist in the codebase after at least 2–3 differently-framed queries come up empty.
+
 **Formulating effective queries**
 
 The semantic index embeds raw source code. The embedding model (jina-embeddings-v2-base-code) was trained on 150M+ natural language / code pairs, so it bridges intent-based queries directly to code. Despite this, query quality directly determines result quality — the model encodes each query into a single dense vector, so a vague or overloaded query produces a vague result.
