@@ -76,7 +76,7 @@ def find(query: str, path: Optional[Path]):
 
         click.echo(f"Searching for: {query}")
         if not query_driver.semantic_available:
-            click.echo("Warning: Semantic index is not available for this directory yet. Results may not be as good.", err=True)
+            click.echo("Warning: Semantic index is not available for this directory yet. For better results, please try again when the semantic index is done building.", err=True)
         results = query_driver.search(query)
         _print_results(results)
 
