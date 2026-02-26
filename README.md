@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://pypi.org/project/filesift/"><img src="https://img.shields.io/pypi/v/filesift" alt="PyPI"></a>
   <a href="https://pypi.org/project/filesift/"><img src="https://img.shields.io/pypi/pyversions/filesift" alt="Python"></a>
-  <a href="https://github.com/roshunsunder/filesift/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roshunsunder/filesift" alt="License"></a>
+  <a href="https://github.com/roshunsunder/filesift/blob/agent_modifications/LICENSE"><img src="https://img.shields.io/github/license/roshunsunder/filesift" alt="License"></a>
 </p>
 
 ---
