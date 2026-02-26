@@ -7,16 +7,59 @@ description: >-
   related files. Triggers on queries like "find the authentication logic",
   "where is the database connection handled", or "search this codebase for
   error handling".
-compatibility: Requires the filesift Python package (pip install filesift). Python 3.11+.
+compatibility: Requires the filesift Python package (pip install filesift). Python 3.12+.
 metadata:
   author: roshunsunder
-  version: "1.0.0"
+  version: "1.0.1"
 allowed-tools: Bash(filesift:*)
 ---
 
 # Searching Codebases with FileSift
 
 FileSift indexes codebases and enables natural language search via hybrid keyword (BM25) + semantic (FAISS embeddings) search, merged with Reciprocal Rank Fusion.
+
+## When to use this skill
+
+Use FileSift when the target is a **concept or behaviour**, not a known identifier.
+
+**Reach for FileSift when:**
+- You're in the exploration phase of a task and need to orient yourself in an unfamiliar codebase
+- The user asks a question that requires understanding *what* code does ("how is auth handled?", "where does billing happen?", "what validates user input?")
+- You need to find an implementation but don't know what it's called — you'd have to guess grep patterns
+- You're looking for the files most relevant to a concept that could be expressed many ways (`retry`, `backoff`, `exponential_sleep`, `with_retries` …)
+- You've read one relevant file and want to find its collaborators by semantic proximity
+
+**Prefer grep / glob instead when:**
+- You already know the exact function name, class name, or string to search for
+- You're tracing a known call chain or import path
+- The search is purely structural (file extensions, directory layout, naming conventions)
+- The codebase is small enough that a directory listing gives you the full picture
+
+The rule of thumb: if you'd have to *guess* the right grep pattern, FileSift will outperform it. If you already *know* the exact token, grep is faster.
+
+## Step 0 — Verify FileSift is installed
+
+**Do this before anything else, every time this skill is invoked for the first time in a session.**
+
+```bash
+filesift --version
+```
+
+If the command is found, proceed to [Quick start](#quick-start).
+
+If it isn't found, install it. FileSift requires **Python 3.12+** and is published on PyPI. The right install command depends on how the user manages Python packages. Always ask the user before running any installation commands.
+
+| Environment | Install command |
+|---|---|
+| pip (default) | `pip install filesift` |
+| uv (tool) | `uv tool install filesift` |
+| uv (project) | `uv add filesift` |
+| pipx | `pipx install filesift` |
+| poetry | `poetry add filesift` |
+| pdm | `pdm add filesift` |
+| conda / mamba | `pip install filesift` (inside the active conda env) |
+
+After installing, confirm with `filesift --version` before proceeding.
 
 ## Quick start
 
@@ -51,6 +94,17 @@ Use conceptual descriptions, not code syntax:
 - "API rate limiting middleware"
 
 Results are ranked by relevance score (0-1). Read the top results to understand the actual implementation.
+
+**Iterating on results**
+
+A single search is rarely enough for complex questions. If the top results don't contain what you're looking for, don't stop — reframe and search again. Treat FileSift like a conversation: each result gives you vocabulary (function names, module names, patterns) you can feed into the next query. Common iteration strategies:
+
+- Results are in the right area but too broad → narrow with a more specific verb or concept (`"parse JWT claims"` instead of `"authentication"`)
+- Results miss the mark entirely → try a synonym or a different layer of abstraction (`"token refresh"` instead of `"login"`)
+- You found one relevant file but need its collaborators → query for what that file *calls* (`"session store write"`, `"user lookup by id"`)
+- A concept spans multiple files → run separate focused queries for each sub-concern and union the results yourself
+
+Only conclude that something doesn't exist in the codebase after at least 2–3 differently-framed queries come up empty.
 
 **Formulating effective queries**
 

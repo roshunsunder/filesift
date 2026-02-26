@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "filesift"
-version = "0.2.0"
+version = "0.2.1"
 description = "Intelligent file indexing and search system"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -34,6 +34,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Filesystems",
     "Topic :: Text Processing :: Indexing",

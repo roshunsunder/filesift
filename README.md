@@ -5,13 +5,12 @@
 <h1 align="center">FileSift</h1>
 
 <p align="center">
-  <em>A fast, open-source utility that helps AI coding agents intelligently search and understand codebases.</em>
+  <em>A local, open-source utility that helps AI coding agents intelligently search and understand codebases.</em>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/filesift/"><img src="https://img.shields.io/pypi/v/filesift" alt="PyPI"></a>
   <a href="https://pypi.org/project/filesift/"><img src="https://img.shields.io/pypi/pyversions/filesift" alt="Python"></a>
-  <a href="https://github.com/roshunsunder/filesift/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roshunsunder/filesift" alt="License"></a>
 </p>
 
 ---

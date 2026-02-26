@@ -158,7 +158,11 @@ TOOLS = [
             "as a developer would phrase it in a docstring — do NOT paste the user's question verbatim. "
             "Strip question framing ('how does', 'where is', 'I need to understand'). "
             "Lead with action verbs: 'parse HTTP response', 'validate user input', 'retry on failure'. "
-            "For multi-concept user requests, call this tool multiple times with one focused concept per query."
+            "For multi-concept user requests, call this tool multiple times with one focused concept per query. "
+            "If the top results don't match what you're looking for, reframe and search again — don't stop after one attempt. "
+            "Use vocabulary from the results you did get (module names, function names, patterns) to sharpen the next query, "
+            "or try a synonym or different level of abstraction. "
+            "Only conclude something doesn't exist after 2-3 differently-framed queries come up empty."
         ),
         inputSchema={
             "type": "object",
