@@ -18,6 +18,25 @@ allowed-tools: Bash(filesift:*)
 
 FileSift indexes codebases and enables natural language search via hybrid keyword (BM25) + semantic (FAISS embeddings) search, merged with Reciprocal Rank Fusion.
 
+## When to use this skill
+
+Use FileSift when the target is a **concept or behaviour**, not a known identifier.
+
+**Reach for FileSift when:**
+- You're in the exploration phase of a task and need to orient yourself in an unfamiliar codebase
+- The user asks a question that requires understanding *what* code does ("how is auth handled?", "where does billing happen?", "what validates user input?")
+- You need to find an implementation but don't know what it's called — you'd have to guess grep patterns
+- You're looking for the files most relevant to a concept that could be expressed many ways (`retry`, `backoff`, `exponential_sleep`, `with_retries` …)
+- You've read one relevant file and want to find its collaborators by semantic proximity
+
+**Prefer grep / glob instead when:**
+- You already know the exact function name, class name, or string to search for
+- You're tracing a known call chain or import path
+- The search is purely structural (file extensions, directory layout, naming conventions)
+- The codebase is small enough that a directory listing gives you the full picture
+
+The rule of thumb: if you'd have to *guess* the right grep pattern, FileSift will outperform it. If you already *know* the exact token, grep is faster.
+
 ## Step 0 — Verify FileSift is installed
 
 **Do this before anything else, every time this skill is invoked for the first time in a session.**
