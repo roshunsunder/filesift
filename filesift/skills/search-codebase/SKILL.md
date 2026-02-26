@@ -28,7 +28,7 @@ filesift --version
 
 If the command is found, proceed to [Quick start](#quick-start).
 
-If it isn't found, install it. FileSift requires **Python 3.12+** and is published on PyPI. The right install command depends on how the user manages Python packages. If you're unsure, ask before running anything.
+If it isn't found, install it. FileSift requires **Python 3.12+** and is published on PyPI. The right install command depends on how the user manages Python packages. Always ask the user before running any installation commands.
 
 | Environment | Install command |
 |---|---|
