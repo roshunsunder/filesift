@@ -7,7 +7,7 @@ description: >-
   related files. Triggers on queries like "find the authentication logic",
   "where is the database connection handled", or "search this codebase for
   error handling".
-compatibility: Requires the filesift Python package (pip install filesift). Python 3.11+.
+compatibility: Requires the filesift Python package (pip install filesift). Python 3.12+.
 metadata:
   author: roshunsunder
   version: "1.0.1"
@@ -17,6 +17,37 @@ allowed-tools: Bash(filesift:*)
 # Searching Codebases with FileSift
 
 FileSift indexes codebases and enables natural language search via hybrid keyword (BM25) + semantic (FAISS embeddings) search, merged with Reciprocal Rank Fusion.
+
+## Step 0 — Verify FileSift is installed
+
+**Do this before anything else, every time this skill is invoked for the first time in a session.**
+
+```bash
+filesift --version
+```
+
+If the command is found, proceed to [Quick start](#quick-start).
+
+If it isn't found, install it. FileSift requires **Python 3.12+** and is published on PyPI. The right install command depends on how the user manages Python packages. Use whatever context you have — lock files, config files, prior conversation — to pick the correct one. If you're unsure, ask before running anything.
+
+| Environment | Install command |
+|---|---|
+| pip (default) | `pip install filesift` |
+| uv (tool) | `uv tool install filesift` |
+| uv (project) | `uv add filesift` |
+| pipx | `pipx install filesift` |
+| poetry | `poetry add filesift` |
+| pdm | `pdm add filesift` |
+| conda / mamba | `pip install filesift` (inside the active conda env) |
+
+**Hints for inferring the right tool:**
+- `uv.lock` or `[tool.uv]` in `pyproject.toml` → user likely uses `uv`
+- `poetry.lock` or `[tool.poetry]` in `pyproject.toml` → use `poetry add`
+- `pdm.lock` → use `pdm add`
+- A plain `requirements.txt` with no other tooling → use `pip install`
+- If the user is in an active virtualenv (check `$VIRTUAL_ENV`), use `pip install` inside it
+
+After installing, confirm with `filesift --version` before proceeding.
 
 ## Quick start
 
