@@ -688,30 +688,76 @@ def kill_daemon(pid: Optional[int], all: bool):
 
 SKILL_NAME = "search-codebase"
 
-AGENT_SKILL_DIRS = {
-    "claude":    Path.home() / ".claude" / "skills",
-    "codex":     Path.home() / ".codex" / "skills",
-    "gemini":    Path.home() / ".gemini" / "skills",
-    "cursor":    Path.home() / ".cursor" / "skills",
-    "windsurf":  Path.home() / ".codeium" / "windsurf" / "skills",
-    "roo":       Path.home() / ".roo" / "skills",
-    "copilot":   Path.home() / ".github" / "skills",
+DEFAULT_AGENT = "claude-code"
+
+# (local_relative_path, global_absolute_path)
+AGENT_CONFIGS: dict[str, tuple[str, Path]] = {
+    "adal":           (".adal/skills",           Path.home() / ".adal" / "skills"),
+    "amp":            (".agents/skills",          Path.home() / ".config" / "agents" / "skills"),
+    "antigravity":    (".agent/skills",           Path.home() / ".gemini" / "antigravity" / "skills"),
+    "augment":        (".augment/skills",         Path.home() / ".augment" / "skills"),
+    "claude-code":    (".claude/skills",          Path.home() / ".claude" / "skills"),
+    "cline":          (".agents/skills",          Path.home() / ".agents" / "skills"),
+    "codebuddy":      (".codebuddy/skills",       Path.home() / ".codebuddy" / "skills"),
+    "codex":          (".agents/skills",          Path.home() / ".codex" / "skills"),
+    "command-code":   (".commandcode/skills",     Path.home() / ".commandcode" / "skills"),
+    "continue":       (".continue/skills",        Path.home() / ".continue" / "skills"),
+    "cortex":         (".cortex/skills",          Path.home() / ".snowflake" / "cortex" / "skills"),
+    "crush":          (".crush/skills",           Path.home() / ".config" / "crush" / "skills"),
+    "cursor":         (".agents/skills",          Path.home() / ".cursor" / "skills"),
+    "droid":          (".factory/skills",         Path.home() / ".factory" / "skills"),
+    "gemini-cli":     (".agents/skills",          Path.home() / ".gemini" / "skills"),
+    "github-copilot": (".agents/skills",          Path.home() / ".copilot" / "skills"),
+    "goose":          (".goose/skills",           Path.home() / ".config" / "goose" / "skills"),
+    "iflow-cli":      (".iflow/skills",           Path.home() / ".iflow" / "skills"),
+    "junie":          (".junie/skills",           Path.home() / ".junie" / "skills"),
+    "kilo":           (".kilocode/skills",        Path.home() / ".kilocode" / "skills"),
+    "kimi-cli":       (".agents/skills",          Path.home() / ".config" / "agents" / "skills"),
+    "kiro-cli":       (".kiro/skills",            Path.home() / ".kiro" / "skills"),
+    "kode":           (".kode/skills",            Path.home() / ".kode" / "skills"),
+    "mcpjam":         (".mcpjam/skills",          Path.home() / ".mcpjam" / "skills"),
+    "mistral-vibe":   (".vibe/skills",            Path.home() / ".vibe" / "skills"),
+    "mux":            (".mux/skills",             Path.home() / ".mux" / "skills"),
+    "neovate":        (".neovate/skills",         Path.home() / ".neovate" / "skills"),
+    "openclaw":       ("skills",                  Path.home() / ".openclaw" / "skills"),
+    "opencode":       (".agents/skills",          Path.home() / ".config" / "opencode" / "skills"),
+    "openhands":      (".openhands/skills",       Path.home() / ".openhands" / "skills"),
+    "pi":             (".pi/skills",              Path.home() / ".pi" / "agent" / "skills"),
+    "pochi":          (".pochi/skills",           Path.home() / ".pochi" / "skills"),
+    "qoder":          (".qoder/skills",           Path.home() / ".qoder" / "skills"),
+    "qwen-code":      (".qwen/skills",            Path.home() / ".qwen" / "skills"),
+    "replit":         (".agents/skills",          Path.home() / ".config" / "agents" / "skills"),
+    "roo":            (".roo/skills",             Path.home() / ".roo" / "skills"),
+    "trae":           (".trae/skills",            Path.home() / ".trae" / "skills"),
+    "trae-cn":        (".trae/skills",            Path.home() / ".trae-cn" / "skills"),
+    "universal":      (".agents/skills",          Path.home() / ".config" / "agents" / "skills"),
+    "windsurf":       (".windsurf/skills",        Path.home() / ".codeium" / "windsurf" / "skills"),
+    "zencoder":       (".zencoder/skills",        Path.home() / ".zencoder" / "skills"),
 }
 
+_AGENT_LIST = ", ".join(sorted(AGENT_CONFIGS))
 
-def _resolve_skill_dir(agent: Optional[str], path: Optional[Path]) -> Path:
-    """Resolve the target skills directory from --agent or --path flags."""
+
+def _resolve_skill_dir(agent: Optional[str], local: bool, path: Optional[Path]) -> Path:
+    """Resolve the target skills directory.
+
+    Priority: --path > --local/--global with --agent (default: claude-code, global).
+    """
     if path:
         return Path(path) / SKILL_NAME
-    if agent:
-        agent = agent.lower()
-        if agent not in AGENT_SKILL_DIRS:
-            raise click.BadParameter(
-                f"Unknown agent '{agent}'. Known agents: {', '.join(sorted(AGENT_SKILL_DIRS))}. "
-                f"Use --path for a custom location."
-            )
-        return AGENT_SKILL_DIRS[agent] / SKILL_NAME
-    return AGENT_SKILL_DIRS["claude"] / SKILL_NAME
+
+    agent_key = (agent or DEFAULT_AGENT).lower()
+    if agent_key not in AGENT_CONFIGS:
+        raise click.BadParameter(
+            f"Unknown agent '{agent_key}'. Known agents: {_AGENT_LIST}. "
+            f"Use --path for a custom location.",
+            param_hint="--agent",
+        )
+
+    local_rel, global_abs = AGENT_CONFIGS[agent_key]
+    if local:
+        return Path.cwd() / local_rel / SKILL_NAME
+    return global_abs / SKILL_NAME
 
 
 @cli.group()
@@ -722,19 +768,27 @@ def skill():
 
 @skill.command()
 @click.option("--agent", type=str, default=None,
-              help=f"Target agent ({', '.join(sorted(AGENT_SKILL_DIRS))}). Default: claude.")
+              help=f"Target agent. Default: {DEFAULT_AGENT}. Choices: {_AGENT_LIST}.")
+@click.option("--local", "local", is_flag=True, default=False,
+              help="Install into the current project directory instead of the global config directory.")
+@click.option("--global", "global_", is_flag=True, default=False,
+              help="Install into the global config directory (default behaviour).")
 @click.option("--path", type=click.Path(path_type=Path), default=None,
-              help="Custom skills directory (skill will be placed inside as a subdirectory).")
-def install(agent: Optional[str], path: Optional[Path]):
+              help="Custom skills directory (skill placed inside as a sub-directory).")
+def install(agent: Optional[str], local: bool, global_: bool, path: Optional[Path]):
     """Install the FileSift skill for agent discovery.
 
-    By default installs to ~/.claude/skills/. Use --agent for other agents
-    (e.g. --agent codex, --agent gemini) or --path for a custom location.
+    By default installs to the agent's global config directory (e.g. ~/.claude/skills/).
+    Pass --local to install into the current project directory instead (e.g. .claude/skills/).
+    Use --agent to target a different agent, or --path for a fully custom location.
     """
     import shutil
 
+    if local and global_:
+        raise click.UsageError("--local and --global are mutually exclusive.")
+
     source = Path(__file__).parent.parent / "skills" / SKILL_NAME
-    target = _resolve_skill_dir(agent, path)
+    target = _resolve_skill_dir(agent, local, path)
 
     if not source.exists():
         click.echo(f"Error: Skill source not found at {source}", err=True)
@@ -753,14 +807,21 @@ def install(agent: Optional[str], path: Optional[Path]):
 
 @skill.command()
 @click.option("--agent", type=str, default=None,
-              help=f"Target agent ({', '.join(sorted(AGENT_SKILL_DIRS))}). Default: claude.")
+              help=f"Target agent. Default: {DEFAULT_AGENT}. Choices: {_AGENT_LIST}.")
+@click.option("--local", "local", is_flag=True, default=False,
+              help="Uninstall from the current project directory instead of the global config directory.")
+@click.option("--global", "global_", is_flag=True, default=False,
+              help="Uninstall from the global config directory (default behaviour).")
 @click.option("--path", type=click.Path(path_type=Path), default=None,
               help="Custom skills directory to uninstall from.")
-def uninstall(agent: Optional[str], path: Optional[Path]):
+def uninstall(agent: Optional[str], local: bool, global_: bool, path: Optional[Path]):
     """Remove the FileSift skill from an agent's skills directory."""
     import shutil
 
-    target = _resolve_skill_dir(agent, path)
+    if local and global_:
+        raise click.UsageError("--local and --global are mutually exclusive.")
+
+    target = _resolve_skill_dir(agent, local, path)
 
     if not target.exists():
         click.echo(f"Skill '{SKILL_NAME}' is not installed at {target}")
