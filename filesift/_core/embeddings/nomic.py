@@ -12,6 +12,8 @@ class NomicEmbedModel(EmbeddingModel):
       - "search_query: " for searching
 
     Embeddings are L2-normalized so inner product == cosine similarity.
+
+    NOTE: This is a fallback embedding model - it's fast but it is not optimal.
     """
 
     DOCUMENT_PREFIX = "search_document: "
@@ -20,8 +22,7 @@ class NomicEmbedModel(EmbeddingModel):
     def __init__(self):
         import torch
         from sentence_transformers import SentenceTransformer
-
-        # Set torch to use single thread to avoid issues in daemon processes
+        
         torch.set_num_threads(1)
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
